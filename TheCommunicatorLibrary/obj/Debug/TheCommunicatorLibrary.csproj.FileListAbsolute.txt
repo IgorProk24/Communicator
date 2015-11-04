@@ -1,0 +1,10 @@
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\TheCommunicatorLibrary.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\TheCommunicatorLibrary.pdb
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\obj\Debug\TheCommunicatorLibrary.csprojResolveAssemblyReference.cache
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\obj\Debug\TheCommunicatorLibrary.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\obj\Debug\TheCommunicatorLibrary.pdb
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\TheCommunicatorLibrary.dll.config
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.SqlServer.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.xml
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.SqlServer.xml

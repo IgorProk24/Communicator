@@ -8,3 +8,8 @@ C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommuni
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.SqlServer.dll
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.xml
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\EntityFramework.SqlServer.xml
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\StyleCop.CSharp.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\StyleCop.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\Microsoft.Build.Utilities.v3.5.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\Microsoft.Build.Utilities.v3.5.xml
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\TheCommunicatorLibrary\bin\Debug\ru\Microsoft.Build.Utilities.v3.5.resources.dll

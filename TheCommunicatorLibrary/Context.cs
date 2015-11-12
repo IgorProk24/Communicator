@@ -13,7 +13,7 @@ namespace TheCommunicatorLibrary
 
         public void SetConnect(CallingSystem newCoonect)
         {
-            callingsystem = newCoonect;
+           callingsystem = newCoonect;
         }
 
         public void Connect()

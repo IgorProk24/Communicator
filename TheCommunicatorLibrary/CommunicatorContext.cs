@@ -10,6 +10,7 @@ namespace TheCommunicatorLibrary
     public class CommunicatorContext : DbContext
     {
         public DbSet<Contact> Contacts { get; set; }
+
         public void DeleteObjectFromDB(Contact contact)
         {
 
@@ -20,6 +21,7 @@ namespace TheCommunicatorLibrary
             {
                 Contacts.Remove(c);
             }
+
             SaveChanges();
         }
     }

@@ -3,10 +3,12 @@ C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicat
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\Communicator.pdb
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\EntityFramework.dll
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\EntityFramework.SqlServer.dll
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\nunit.framework.dll
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\TheCommunicatorLibrary.dll
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\TheCommunicatorLibrary.pdb
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\EntityFramework.xml
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\EntityFramework.SqlServer.xml
+C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\nunit.framework.xml
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\obj\Debug\Communicator.csprojResolveAssemblyReference.cache
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\obj\Debug\Autorization.g.cs
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\obj\Debug\MainWindow.g.cs
@@ -20,5 +22,3 @@ C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicat
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\obj\Debug\Communicator.csproj.GenerateResource.Cache
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\obj\Debug\Communicator.exe
 C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\obj\Debug\Communicator.pdb
-C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\nunit.framework.dll
-C:\Users\proko_000\Documents\Visual Studio 2015\Projects\Communicator\Communicator\bin\Debug\nunit.framework.xml

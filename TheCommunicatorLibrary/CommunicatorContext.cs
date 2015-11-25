@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,15 +13,15 @@ namespace TheCommunicatorLibrary
         public void DeleteObjectFromDB(Contact contact)
         {
 
-            var query = from c in Contacts
+            var query = from c in this.Contacts
                         where c.Id == contact.Id
                         select c;
             foreach (var c in query)
             {
-                Contacts.Remove(c);
+                this.Contacts.Remove(c);
             }
 
-            SaveChanges();
+            this.SaveChanges();
         }
     }
 }

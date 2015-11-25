@@ -9,7 +9,8 @@ namespace TheCommunicatorLibrary
 {
     public interface IConnection
     {
-        void Connect(Contact One, Contact Two);
+        void Connect(Contact one, Contact two);
+
         string ToString();
     }
 }

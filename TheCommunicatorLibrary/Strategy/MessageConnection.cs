@@ -10,10 +10,12 @@ namespace TheCommunicatorLibrary
     public class MessageConnection : IConnection
     {
         public string Connecting { get; set; }
-        public void Connect(Contact One, Contact Two)
+
+        public void Connect(Contact one, Contact two)
         {
             throw new NotImplementedException();
         }
+
         public override string ToString()
         {
             return GetType().ToString();

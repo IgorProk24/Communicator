@@ -7,7 +7,7 @@ using System.Data.Entity;
 
 namespace TheCommunicatorLibrary
 {
-    public class VideoConf : CallingSystem
+    public class VideoConf : ICallingSystem
     {
         public void Use()
         {

@@ -9,11 +9,14 @@ namespace TheCommunicatorLibrary
 {
     public class VideoConnection : IConnection
     {
-        public string a { get; set; }
-        public void Connect(Contact One, Contact Two)
+
+        public string A { get; set; }
+
+        public void Connect(Contact one, Contact two)
         {
-            a = "4";
+            this.A = "4";
         }
+
         public override string ToString()
         {
             return GetType().ToString();

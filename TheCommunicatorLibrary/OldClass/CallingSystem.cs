@@ -7,7 +7,7 @@ using System.Data.Entity;
 
 namespace TheCommunicatorLibrary
 {
-    public interface CallingSystem
+    public interface ICallingSystem
     {
         void Use();
     }

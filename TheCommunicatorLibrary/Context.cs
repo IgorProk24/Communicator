@@ -9,16 +9,16 @@ namespace TheCommunicatorLibrary
 {
     public class Context
     {
-        private CallingSystem callingsystem;
+        private ICallingSystem callingsystem;
 
-        public void SetConnect(CallingSystem newCoonect)
+        public void SetConnect(ICallingSystem newCoonect)
         {
-           callingsystem = newCoonect;
+           this.callingsystem = newCoonect;
         }
 
         public void Connect()
         {
-            callingsystem.Use();
+            this.callingsystem.Use();
         }
     }
 }

@@ -22,13 +22,25 @@ namespace Communicator
     /// </summary>
     public partial class MainWindow : Window
     {
-        IConnection Connection;
+        VideoConnection vc = new VideoConnection();
+        IConnection connection;
+
         public MainWindow()
         {
             InitializeComponent();
         }
-        VideoConnection vc = new VideoConnection();
-        private void listBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+
+        public void RefreshLB()
+        {
+            var db = new CommunicatorContext();
+            var query = from c in db.Contacts
+                        orderby c.Name
+                        select c;
+
+            listBox.ItemsSource = query.ToList();
+        }
+
+        private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             
         }
@@ -40,50 +52,34 @@ namespace Communicator
             {
                Contact c = new Contact(i.ToString(), i.ToString(), i.ToString(), i.ToString(), i.ToString());
             }
-            //Contact.Contacts.Values.ToList()[2].State = Contact.ContactState.Offline;
-            //Contact.Contacts.Values.ToList()[4].State = Contact.ContactState.Offline;
-            vc.a = "5";
-           
+
+            vc.A = "5";
 
             RefreshLB();
-            List<IConnection> Connections = new List<IConnection>();
-            Connections.Add(new VideoConnection());
-            Connections.Add(new PhoneConnection());
-            Connections.Add(new MessageConnection());
-            comboBox.ItemsSource = Connections;
+            List<IConnection> connections = new List<IConnection>();
+            connections.Add(new VideoConnection());
+            connections.Add(new PhoneConnection());
+            connections.Add(new MessageConnection());
+            comboBox.ItemsSource = connections;
         }
 
-        private void comboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            Connection = (IConnection)comboBox.SelectedItem;
+            connection = (IConnection)comboBox.SelectedItem;
         }
 
-        private void button_Click(object sender, RoutedEventArgs e)
+        private void Button_Click(object sender, RoutedEventArgs e)
         {
-            Connection.Connect((Contact)listBox.SelectedItem, (Contact)listBox.SelectedItem);
-            MessageBox.Show(vc.a);
+            connection.Connect((Contact)listBox.SelectedItem, (Contact)listBox.SelectedItem);
+            MessageBox.Show(vc.A);
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
-            
 
         }
 
-        public void RefreshLB()
-        {
-            var db = new CommunicatorContext();
-            var query = from c in db.Contacts
-                        orderby c.Name
-                        select c;
-
-
-
-            listBox.ItemsSource = query.ToList();
-        }
-
-
-        private void button_delete_Click(object sender, RoutedEventArgs e)
+        private void Button_delete_Click(object sender, RoutedEventArgs e)
         {
             var db = new CommunicatorContext();
             db.DeleteObjectFromDB((Contact)listBox.SelectedItem);

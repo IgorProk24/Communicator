@@ -9,10 +9,10 @@ namespace TheCommunicatorLibrary
 {
     public class PhoneConnection : IConnection
     {
-        public void Connect(Contact One, Contact Two)
+        public void Connect(Contact one, Contact two)
         {
-            
         }
+
         public override string ToString()
         {
             return GetType().ToString();

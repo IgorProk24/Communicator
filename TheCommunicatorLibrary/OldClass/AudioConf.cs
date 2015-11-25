@@ -7,7 +7,7 @@ using System.Data.Entity;
 
 namespace TheCommunicatorLibrary
 {
-    public class AudioConf : CallingSystem
+    public class AudioConf : ICallingSystem
     {
         public void Use()
         {

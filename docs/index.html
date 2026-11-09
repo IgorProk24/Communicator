@@ -3,62 +3,81 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#0d0a1a" />
-  <title>Хроніки Гоґвортсу — комікс-сторіс</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231a1233' stroke='%23f2c45a' stroke-width='3'/%3E%3Cpath d='M36 10 18 36h12l-4 18 20-28H34z' fill='%23f2c45a'/%3E%3C/svg%3E" />
+  <meta name="theme-color" content="#120d14" />
+  <title>Історії на двох</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23120d14'/%3E%3Cpath d='M32 50s-16-9.5-16-21a9 9 0 0 1 16-5.6A9 9 0 0 1 48 29c0 11.5-16 21-16 21z' fill='%23e8a79a'/%3E%3C/svg%3E" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Хроніки" />
+  <meta name="apple-mobile-web-app-title" content="На двох" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Neucha&family=Philosopher:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,600;0,700;1,600&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Home -->
+  <!-- Library -->
   <main id="home" class="screen">
     <div class="home-inner">
-      <div class="crest" aria-hidden="true">⚡</div>
-      <h1>Хроніки Гоґвортсу</h1>
-      <p class="tagline">Комікс у форматі сторіс, сюжет якого пишеш ти. Кожні 5 слайдів ти вирішуєш, що буде далі.</p>
+      <header class="lib-head">
+        <div>
+          <h1>Історії на двох</h1>
+          <p class="tagline">Обери історію і проживи її по-своєму. Кожні 5 кадрів ти вирішуєш, що буде далі.</p>
+        </div>
+        <button id="keysToggle" class="icon-chip" type="button" aria-label="Ключі API">🔑</button>
+      </header>
 
       <div id="keysBox" class="keys" hidden>
         <form id="keysForm">
-          <h2>🔑 Ключі API</h2>
+          <h2>Ключі API</h2>
           <p class="keys-sub">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic та OpenRouter.</p>
           <label for="keyAnthropic">Anthropic (сюжет) — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">отримати</a></label>
           <input id="keyAnthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
           <label for="keyOpenrouter">OpenRouter (фото) — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">отримати</a></label>
           <input id="keyOpenrouter" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…" />
+          <label for="keyImageModel">Модель фото на OpenRouter (необов'язково)</label>
+          <input id="keyImageModel" type="text" autocomplete="off" spellcheck="false" placeholder="google/gemini-2.5-flash-image" />
           <div id="keysStatus" class="keys-status" aria-live="polite"></div>
           <button type="button" id="keysCheck" class="btn btn-ghost">Перевірити ключі</button>
-          <button type="submit" class="btn btn-gold">Зберегти</button>
+          <button type="submit" class="btn btn-accent">Зберегти</button>
         </form>
       </div>
 
-      <div id="resumeBox" class="resume hidden">
-        <button id="resumeBtn" class="btn btn-gold"></button>
-        <button id="newStoryBtn" class="btn btn-ghost">Почати нову історію</button>
-      </div>
-
-      <form id="startForm" class="start-form">
-        <label for="startPrompt">З чого почнеться історія?</label>
-        <textarea id="startPrompt" rows="3" maxlength="1000" placeholder="Наприклад: Гаррі знаходить таємну кімнату під Великою залою…"></textarea>
-        <div class="chips" id="startChips"></div>
-        <button type="submit" class="btn btn-gold">✨ Почати історію</button>
-      </form>
+      <section class="library" id="library" aria-label="Історії"></section>
       <p id="demoNote" class="note hidden"></p>
-      <button id="keysToggle" class="link-btn keys-toggle" type="button" hidden>🔑 Змінити ключі API</button>
     </div>
   </main>
 
+  <!-- Story card -->
+  <div id="intro" class="sheet-wrap" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <div class="sheet-cover" id="introCover"></div>
+      <div class="sheet-body">
+        <p class="eyebrow" id="introHeroine"></p>
+        <h2 id="introTitle"></h2>
+        <p class="sheet-setting" id="introSetting"></p>
+        <div id="introProgress" class="intro-progress" hidden>
+          <button type="button" class="btn btn-accent" id="introContinue"></button>
+          <button type="button" class="btn btn-ghost" id="introRestart">Почати заново</button>
+          <p class="form-note" id="introRestartNote" hidden>Ще раз натисни «Почати заново», щоб стерти цю історію.</p>
+        </div>
+        <form id="introForm" class="intro-form">
+          <label for="introPrompt">Перший крок</label>
+          <textarea id="introPrompt" rows="2" maxlength="1000"></textarea>
+          <button type="submit" class="btn btn-accent">Почати історію</button>
+        </form>
+        <button type="button" class="link-btn sheet-close" id="introClose">Закрити</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Stories viewer -->
-  <section id="viewer" class="screen hidden" aria-label="Комікс">
+  <section id="viewer" class="screen hidden" aria-label="Історія">
     <div id="stage" class="stage">
       <div class="bars" id="bars"></div>
       <div class="topbar">
+        <div class="avatar" id="viewerAvatar" aria-hidden="true"></div>
         <div class="chapter-label" id="chapterLabel"></div>
         <button class="icon-btn" id="pauseBtn" aria-label="Пауза">❚❚</button>
-        <button class="icon-btn" id="closeBtn" aria-label="На головну">✕</button>
+        <button class="icon-btn" id="closeBtn" aria-label="До бібліотеки">✕</button>
       </div>
       <div class="slide" id="slide"></div>
 
@@ -69,12 +88,12 @@
             <button class="link-btn" id="askBackBtn">‹ Назад</button>
             <span class="ask-chapter" id="askChapter"></span>
           </div>
-          <h2>Що буде далі?</h2>
-          <p class="ask-sub">Напиши будь-що, і наступні 5 слайдів намалюються саме про це.</p>
+          <h2>Що робиш далі?</h2>
+          <p class="ask-sub">Напиши будь-що, і наступні 5 кадрів будуть саме про це.</p>
           <form id="askForm">
-            <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Твоє продовження…"></textarea>
+            <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Твоя дія…"></textarea>
             <div class="chips" id="askChips"></div>
-            <button type="submit" class="btn btn-gold">✨ Чаклувати далі</button>
+            <button type="submit" class="btn btn-accent">Продовжити</button>
           </form>
         </div>
       </div>
@@ -83,12 +102,9 @@
 
   <!-- Loading -->
   <div id="loading" class="loading hidden" role="status" aria-live="polite">
-    <div class="wand">
-      <span class="spark s1">✦</span><span class="spark s2">✧</span><span class="spark s3">✦</span><span class="spark s4">✧</span>
-      <span class="owl">🦉</span>
-    </div>
-    <p id="loadingText">Сова несе новий сувій…</p>
-    <p class="loading-sub" id="loadingProgress">Пишемо наступні 5 слайдів</p>
+    <div class="pulse" aria-hidden="true"><span></span><span></span><span></span></div>
+    <p id="loadingText">Пишемо продовження…</p>
+    <p class="loading-sub" id="loadingProgress">Наступні 5 кадрів</p>
     <p class="loading-time" id="loadingTime">0:00</p>
     <p class="loading-hint">Не згортай браузер, поки йде генерація.</p>
     <button type="button" class="btn btn-ghost loading-cancel" id="loadingCancel">Скасувати</button>

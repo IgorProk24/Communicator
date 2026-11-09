@@ -5,33 +5,35 @@ const env = globalThis.process?.env ?? {};
 
 export const SLIDES_PER_CHAPTER = 5;
 
-export const SYSTEM_PROMPT = `Ти — сценарист інтерактивного коміксу-фанфіку у світі Гаррі Поттера, який читають у форматі сторіс на телефоні.
+export const SYSTEM_PROMPT = `Ти — автор інтерактивних романтичних історій, які читають у форматі сторіс на телефоні.
 
-Історія твориться разом із читачем: після кожних ${SLIDES_PER_CHAPTER} слайдів він пише, що має статися далі, а ти пишеш наступний розділ рівно з ${SLIDES_PER_CHAPTER} слайдів.
+Читач — головний герой. Історія розвивається разом із ним: після кожних ${SLIDES_PER_CHAPTER} слайдів він пише, що робить або що має статися далі, а ти пишеш наступний розділ рівно з ${SLIDES_PER_CHAPTER} слайдів.
 
 Як писати:
-- Мова — українська. Імена й назви бери з українського перекладу «А-БА-БА-ГА-ЛА-МА-ГА»: Гаррі Поттер, Герміона Ґрейнджер, Рон Візлі, Албус Дамблдор, Северус Снейп, Драко Мелфой, Геґрід, Гоґвортс, Ґрифіндор, Слизерин, квідич, маґли тощо.
-- Розвивай саме те, що попросив читач, навіть якщо це несподіваний поворот. Зберігай характери героїв і логіку світу, зв'язність із попередніми розділами.
-- Кожен слайд — один кадр коміксу з чіткою дією. Розділ має власну міні-арку, а останній, ${SLIDES_PER_CHAPTER}-й слайд закінчується інтригою чи вибором, щоб читачеві хотілося вирішити, що буде далі.
-- narration — коротка підводка оповідача, до 180 символів. dialogues — 0–2 короткі репліки на слайд, кожна до 110 символів. Пиши живо, з гумором і емоціями, як у добрих коміксах.
-- sfx — звукове слово для кадру з дією («БАХ!», «ШУРХ…», «ВЖУХ!»), або порожній рядок.
+- Мова — українська, жива й сучасна. Звертайся до читача на «ти» і пиши в теперішньому часі («Ти заходиш у кав'ярню…»), уникаючи слів, що виказують стать читача.
+- Героїня — жива людина зі своїм характером, гумором, бажаннями й межами. Вона не погоджується на все одразу, може жартувати, сперечатися, дивувати. Тримай її характер і манеру мовлення з картки історії.
+- Розвивай саме те, що написав читач, зберігай зв'язність із попередніми розділами і поступово розвивай стосунки.
+- Кожен слайд — одна сцена з чіткою дією або емоцією. Останній, ${SLIDES_PER_CHAPTER}-й слайд закінчується моментом, після якого хочеться вирішити, що робити далі.
+- narration — коротка оповідь до 180 символів. dialogues — 0–2 короткі репліки на слайд, кожна до 110 символів; репліки читача підписуй «Ти». sfx — порожній рядок або коротке звукове слово, якщо доречно.
 
-Ілюстрації малює окрема модель, яка не знає сюжету і не читає українською, тому:
-- image_prompt пиши англійською, як опис кадру з фільму: що відбувається, ракурс (close-up, medium shot, wide shot, low angle…), місце, світло, емоції на обличчях. Вертикальна композиція; верх і низ кадру лишай спокійнішими, бо там будуть підписи й репліки.
-- Не називай у image_prompt жодних імен персонажів, назв франшизи чи брендів — описуй людей тільки за зовнішністю (наприклад, "the bespectacled boy with messy black hair"). Не проси тексту, літер чи бульбашок із репліками на картинці.
-- characters_in_frame — імена (як у characters) усіх, хто видно в кадрі.
-- characters — повний актуальний «візуальний паспорт» усіх персонажів, що вже з'являлися: name українською, visual англійською (вік, статура, волосся, очі, одяг, характерні деталі). Зберігай описи з попередніх розділів незмінними, щоб герої виглядали однаково; додавай нових за потреби.
+Межі контенту (обов'язкові):
+- Романтика, флірт, обійми, поцілунки, близькість і теплі емоції — так. Відвертих сексуальних сцен немає: якщо події йдуть до інтиму, переходь «за кадр» до наступного ранку чи моменту.
+- Усі персонажі — дорослі. Жодних романтичних сюжетів між родичами.
+- Згода і повага: героїня сама вирішує, що робити. Якщо читач просить щось грубе, принизливе чи жорстоке, м'яко поверни історію в тепле русло через реакцію героїні.
 
-Наостанок дай next_options — 3 короткі (до 60 символів), різні за настроєм ідеї, що могло б статися далі.
+Ілюстрації — реалістичні фото — малює окрема модель, яка не знає сюжету й не читає українською, тому:
+- image_prompt пиши англійською як опис кадру: що відбувається, місце, світло, ракурс, емоція на обличчі, одяг. Кадр від першої особи (POV) або так, що читача видно лише частково (рука, плече, спина). Героїня завжди повністю вдягнена, без відвертих поз.
+- Не вигадуй героїні нову зовнішність: у кадрі вона така, як у її описі.
+- characters_in_frame — імена людей у кадрі (як у characters), крім читача.
+- characters — актуальний список усіх персонажів історії, крім читача: name українською, visual англійською (вік, статура, волосся, обличчя, одяг). Героїню бери з картки історії без змін; інших додавай за потреби й не змінюй їхні описи.
 
-Якщо запит читача недоречний для світу чи жорстокий, м'яко поверни історію в безпечне, але цікаве русло, не виходячи з ролі оповідача.`;
+Наостанок дай next_options — 3 короткі (до 60 символів), різні за настроєм варіанти, що читач міг би зробити далі (від першої особи, наприклад «Запросити її на каву»).`;
 
 export const CHAPTER_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['story_title', 'chapter_title', 'characters', 'slides', 'next_options'],
+  required: ['chapter_title', 'characters', 'slides', 'next_options'],
   properties: {
-    story_title: { type: 'string', description: 'Назва всієї історії. Якщо вона вже є — повтори без змін.' },
     chapter_title: { type: 'string', description: 'Коротка назва цього розділу.' },
     characters: {
       type: 'array',
@@ -39,10 +41,7 @@ export const CHAPTER_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         required: ['name', 'visual'],
-        properties: {
-          name: { type: 'string' },
-          visual: { type: 'string' },
-        },
+        properties: { name: { type: 'string' }, visual: { type: 'string' } },
       },
     },
     slides: {
@@ -60,10 +59,7 @@ export const CHAPTER_SCHEMA = {
               type: 'object',
               additionalProperties: false,
               required: ['speaker', 'text'],
-              properties: {
-                speaker: { type: 'string' },
-                text: { type: 'string' },
-              },
+              properties: { speaker: { type: 'string' }, text: { type: 'string' } },
             },
           },
           sfx: { type: 'string' },
@@ -76,56 +72,77 @@ export const CHAPTER_SCHEMA = {
   },
 };
 
-// Everything the reader has seen so far, as compact text, plus their new wish.
+// story = { title, setting, heroine: {name, age, about, visual}, characters[], chapters[] }
 export function buildUserMessage(story, prompt) {
-  const parts = [];
-  if (!story || !story.chapters?.length) {
-    parts.push('Це початок нової історії.');
+  const h = story.heroine;
+  const parts = [
+    `# Картка історії «${story.title}»`,
+    `Завязка: ${story.setting}`,
+    `Героїня: ${h.name}, ${h.age}. ${h.about}`,
+    `Зовнішність героїні (англійською, для ілюстрацій): ${h.visual}`,
+  ];
+  const others = (story.characters || []).filter((c) => c.name !== h.name);
+  if (others.length) {
+    parts.push('Інші персонажі (зберігай описи):\n' + others.map((c) => `- ${c.name}: ${c.visual}`).join('\n'));
+  }
+  const chapters = story.chapters || [];
+  if (!chapters.length) {
+    parts.push('Це перший розділ історії.');
   } else {
-    parts.push(`Назва історії: «${story.title}».`);
-    if (story.characters?.length) {
-      parts.push(
-        'Візуальні паспорти персонажів (зберігай їх):\n' +
-          story.characters.map((c) => `- ${c.name}: ${c.visual}`).join('\n'),
-      );
-    }
     parts.push('Історія досі:');
-    story.chapters.forEach((ch, i) => {
-      const lines = [`\n## Розділ ${i + 1}: ${ch.title}`, `Побажання читача: «${ch.prompt}»`];
+    // Keep the prompt bounded: older chapters as narration only.
+    chapters.forEach((ch, i) => {
+      const recent = i >= chapters.length - 3;
+      const lines = [`## Розділ ${i + 1}: ${ch.title} (вибір читача: «${ch.prompt}»)`];
       ch.slides.forEach((s, j) => {
-        lines.push(`Слайд ${j + 1}. ${s.narration}`);
-        for (const d of s.dialogues || []) lines.push(`  ${d.speaker}: ${d.text}`);
+        lines.push(`${j + 1}. ${s.narration}`);
+        if (recent) for (const d of s.dialogues || []) lines.push(`   ${d.speaker}: ${d.text}`);
       });
       parts.push(lines.join('\n'));
     });
   }
   parts.push(
-    `\nЧитач хоче, щоб далі сталося ось що:\n«${prompt}»\n\nНапиши розділ ${(story?.chapters?.length || 0) + 1} — рівно ${SLIDES_PER_CHAPTER} слайдів.`,
+    `\nЧитач хоче, щоб далі сталося ось що:\n«${prompt}»\n\nНапиши розділ ${chapters.length + 1} — рівно ${SLIDES_PER_CHAPTER} слайдів.`,
   );
   return parts.join('\n\n');
 }
 
 const STYLES = {
   realistic:
-    'Photorealistic cinematic film still, vertical 9:16 frame. Shot on 35mm, natural skin texture, ' +
-    'realistic lighting with soft volumetric haze, shallow depth of field, rich but natural colors, ' +
-    'set in a gothic wizarding castle world with candles, stone and wood. Characters are original ' +
-    'people who do not resemble any real actor or celebrity. Absolutely no text, letters, captions, ' +
-    'logos, watermarks or speech bubbles in the image.',
+    'Photorealistic candid photo, vertical 9:16 frame, shot on a full-frame camera with a 35mm lens. ' +
+    'Natural skin texture, realistic light, shallow depth of field, true-to-life colors, contemporary ' +
+    'Ukrainian city setting. Everyone is an adult and fully clothed in everyday clothes; tasteful, ' +
+    'non-suggestive composition. No text, captions, logos, watermarks or speech bubbles.',
   comic:
-    'Vertical comic book panel, 2:3 portrait. Rich hand-inked lines with painterly watercolor shading, ' +
-    'cinematic lighting, magical warm-and-moody palette, expressive faces, detailed background of a ' +
-    'gothic wizarding castle world. Original character designs. Absolutely no text, letters, captions, ' +
-    'logos or speech bubbles in the image.',
+    'Vertical comic book panel, 9:16. Clean inked lines with painterly shading, cinematic lighting, ' +
+    'expressive faces, contemporary city setting. Everyone is an adult and fully clothed. ' +
+    'No text, letters, captions, logos or speech bubbles.',
 };
 export const IMAGE_STYLE = STYLES[env.IMAGE_STYLE] || STYLES.realistic;
 
-export function buildImagePrompt(slide, characters = []) {
+// Reference portrait of the heroine: every later panel is drawn from it, so her face stays the same.
+export function buildPortraitPrompt(heroine) {
+  return (
+    `${IMAGE_STYLE}\n\nPortrait photo, from the waist up, looking at the camera with a natural, warm expression. ` +
+    `Soft daylight, simple softly blurred background.\nThe person: ${heroine.visual}`
+  );
+}
+
+export function buildImagePrompt(slide, characters = [], { heroine, hasReference = false } = {}) {
   const inFrame = new Set((slide.characters_in_frame || []).map((n) => n.trim().toLowerCase()));
   const cast = characters.filter((c) => inFrame.has(c.name.trim().toLowerCase()));
+  if (heroine && inFrame.has(heroine.name.trim().toLowerCase()) && !cast.some((c) => c.name === heroine.name)) {
+    cast.unshift({ name: heroine.name, visual: heroine.visual });
+  }
   let prompt = `${IMAGE_STYLE}\n\nScene: ${slide.image_prompt}`;
   if (cast.length) {
-    prompt += '\n\nCharacters in this panel (keep their look exactly):\n' + cast.map((c) => `- ${c.visual}`).join('\n');
+    prompt += '\n\nPeople in the frame (keep their look exactly):\n' + cast.map((c) => `- ${c.visual}`).join('\n');
+  }
+  if (hasReference && heroine) {
+    prompt +=
+      '\n\nThe attached photo is a reference portrait of the main woman in this scene. ' +
+      'Wherever she appears, it must be clearly the same person: same face, hair, skin tone and build. ' +
+      'Change only pose, expression, outfit details and setting as the scene requires.';
   }
   return prompt;
 }

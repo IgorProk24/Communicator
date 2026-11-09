@@ -22,7 +22,7 @@ await build({
   logLevel: 'warning',
 });
 
-for (const f of ['app.js', 'styles.css']) await copyFile(path.join(root, 'public', f), path.join(out, f));
+for (const f of ['app.js', 'styles.css', 'catalog.js']) await copyFile(path.join(root, 'public', f), path.join(out, f));
 
 const html = await readFile(path.join(root, 'public/index.html'), 'utf8');
 const marker = '<script type="module" src="app.js"></script>';

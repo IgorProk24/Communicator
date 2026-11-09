@@ -2,7 +2,7 @@
 // stay in this browser's localStorage. Bundled to docs/engine.js by scripts/build-pages.mjs.
 import Anthropic from '@anthropic-ai/sdk';
 import { writeChapterWith, DEFAULTS, apiErrorDetail } from '../server/story.js';
-import { buildImagePrompt } from '../server/prompts.js';
+import { buildImagePrompt, buildPortraitPrompt } from '../server/prompts.js';
 
 const KEYS = 'hogwarts-stories:keys';
 const IMAGE_MODEL = 'google/gemini-2.5-flash-image';
@@ -113,19 +113,28 @@ async function chapter({ story, prompt }, { onProgress, signal } = {}) {
   }
 }
 
-async function image({ slide, characters }) {
-  const { openrouter } = readKeys();
+// Draws a slide, or (with `portrait`) the heroine's reference portrait. A `reference` portrait is
+// sent along with every slide so the image model keeps her face the same across the story.
+async function image({ slide, characters, heroine, reference, portrait }) {
+  const keys = readKeys();
+  const { openrouter } = keys;
   if (!openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (🔑).', 400);
-  const prompt = buildImagePrompt(slide, Array.isArray(characters) ? characters : []);
+  const refData = reference ? await resolveUrl(reference).catch(() => null) : null;
+  const prompt = portrait
+    ? buildPortraitPrompt(portrait)
+    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData) });
+  const content = refData
+    ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: refData } }]
+    : prompt;
 
   let data;
   for (let attempt = 1; ; attempt++) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${openrouter}`, 'Content-Type': 'application/json', 'X-Title': 'Hogwarts Stories' },
+      headers: { Authorization: `Bearer ${openrouter}`, 'Content-Type': 'application/json', 'X-Title': 'Stories for Two' },
       body: JSON.stringify({
-        model: IMAGE_MODEL,
-        messages: [{ role: 'user', content: prompt }],
+        model: keys.imageModel || IMAGE_MODEL,
+        messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
         image_config: { aspect_ratio: '9:16' },
       }),

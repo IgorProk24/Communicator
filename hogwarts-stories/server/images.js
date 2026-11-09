@@ -49,17 +49,22 @@ async function withRetry(fn) {
 }
 
 // ---------- OpenRouter ----------
-async function openrouterImage(prompt) {
+async function openrouterImage(prompt, reference) {
   const res = await fetch(`${OPENROUTER_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
-      'X-Title': 'Hogwarts Stories',
+      'X-Title': 'Stories for Two',
     },
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        {
+          role: 'user',
+          content: reference ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: reference } }] : prompt,
+        },
+      ],
       modalities: ['image', 'text'],
       image_config: { aspect_ratio: '9:16' },
     }),
@@ -98,12 +103,13 @@ async function openaiImage(prompt) {
   return { ext: 'webp', buffer: Buffer.from(b64, 'base64') };
 }
 
-export async function drawPanel(prompt, outDir) {
+// `reference` (a data URL) is passed to OpenRouter so the heroine keeps the same face.
+export async function drawPanel(prompt, outDir, reference = null) {
   return withSlot(async () => {
     let image;
     const started = Date.now();
     try {
-      image = await withRetry(() => (PROVIDER === 'openrouter' ? openrouterImage(prompt) : openaiImage(prompt)));
+      image = await withRetry(() => (PROVIDER === 'openrouter' ? openrouterImage(prompt, reference) : openaiImage(prompt)));
     } catch (err) {
       console.error(`[${PROVIDER}] image error`, err?.status, err?.message);
       if (err?.status === 401 || err?.status === 403) throw new ImageError('Невірний ключ API для картинок на сервері.', 500);

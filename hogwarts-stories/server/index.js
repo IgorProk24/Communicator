@@ -3,7 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeChapter, StoryError } from './story.js';
 import { drawPanel, ImageError, PROVIDER } from './images.js';
-import { buildImagePrompt } from './prompts.js';
+import { readFile } from 'node:fs/promises';
+import { buildImagePrompt, buildPortraitPrompt } from './prompts.js';
 import { mockChapter, mockPanelSvg } from './mock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -27,7 +28,7 @@ if (APP_PASSWORD) {
   });
 }
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '6mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/generated', express.static(IMAGES_DIR, { maxAge: '30d', immutable: true }));
 
@@ -37,11 +38,14 @@ app.get('/api/config', (_req, res) => {
 
 const clean = (s, max) => (typeof s === 'string' ? s.trim().slice(0, max) : '');
 
-// Write the next 5 slides. Body: { story: {title, characters, chapters[]} | null, prompt }
+// Write the next 5 slides. Body: { story: {title, setting, heroine, characters, chapters[]}, prompt }
 app.post('/api/chapter', async (req, res) => {
   const prompt = clean(req.body?.prompt, 1000);
   if (!prompt) return res.status(400).json({ error: 'Напиши, що має статися далі.' });
-  const story = req.body?.story ?? null;
+  const story = req.body?.story;
+  if (!story || !validPerson(story.heroine) || typeof story.setting !== 'string') {
+    return res.status(400).json({ error: 'Немає картки історії.' });
+  }
 
   try {
     const chapter = DEMO
@@ -54,10 +58,26 @@ app.post('/api/chapter', async (req, res) => {
   }
 });
 
-// Draw one panel. Body: { slide: {image_prompt, characters_in_frame}, characters[] , seed }
+const validPerson = (c) => c && typeof c.name === 'string' && typeof c.visual === 'string';
+
+// A reference given as one of our own /generated/ files is read from disk; data URLs pass through.
+async function loadReference(ref) {
+  if (typeof ref !== 'string') return null;
+  if (ref.startsWith('data:image/')) return ref.length < 4_000_000 ? ref : null;
+  const m = ref.match(/^\/generated\/([\w-]+\.(png|jpg|webp))$/);
+  if (!m) return null;
+  const buf = await readFile(path.join(IMAGES_DIR, m[1])).catch(() => null);
+  if (!buf) return null;
+  const type = m[2] === 'jpg' ? 'jpeg' : m[2];
+  return `data:image/${type};base64,${buf.toString('base64')}`;
+}
+
+// Draw one panel, or the heroine's reference portrait.
+// Body: { slide: {image_prompt, characters_in_frame}, characters[], heroine, reference, seed } | { portrait: heroine }
 app.post('/api/image', async (req, res) => {
   const slide = req.body?.slide;
-  if (!slide || !clean(slide.image_prompt, 4000)) return res.status(400).json({ error: 'Немає опису кадру.' });
+  const portrait = validPerson(req.body?.portrait) ? req.body.portrait : null;
+  if (!portrait && (!slide || !clean(slide.image_prompt, 4000))) return res.status(400).json({ error: 'Немає опису кадру.' });
 
   if (PLACEHOLDER_IMAGES) {
     const svg = mockPanelSvg(Number(req.body?.seed) || 0);
@@ -66,12 +86,21 @@ app.post('/api/image', async (req, res) => {
   }
 
   try {
-    const characters = Array.isArray(req.body?.characters) ? req.body.characters : [];
-    const prompt = buildImagePrompt(
-      { image_prompt: clean(slide.image_prompt, 4000), characters_in_frame: slide.characters_in_frame || [] },
-      characters.filter((c) => c && typeof c.name === 'string' && typeof c.visual === 'string'),
-    );
-    const file = await drawPanel(prompt, IMAGES_DIR);
+    let prompt;
+    let reference = null;
+    if (portrait) {
+      prompt = buildPortraitPrompt(portrait);
+    } else {
+      const characters = Array.isArray(req.body?.characters) ? req.body.characters.filter(validPerson) : [];
+      const heroine = validPerson(req.body?.heroine) ? req.body.heroine : null;
+      reference = await loadReference(req.body?.reference);
+      prompt = buildImagePrompt(
+        { image_prompt: clean(slide.image_prompt, 4000), characters_in_frame: slide.characters_in_frame || [] },
+        characters,
+        { heroine, hasReference: Boolean(reference) },
+      );
+    }
+    const file = await drawPanel(prompt, IMAGES_DIR, reference);
     res.json({ url: `/generated/${file}` });
   } catch (err) {
     if (!(err instanceof ImageError)) console.error(err);
@@ -80,7 +109,7 @@ app.post('/api/image', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✨ Hogwarts Stories: http://localhost:${PORT}`);
+  console.log(`✨ Історії на двох: http://localhost:${PORT}`);
   if (DEMO) console.log('   Демо-режим: сценарій і картинки — заглушки, ключі API не потрібні.');
   else if (PLACEHOLDER_IMAGES) console.log('   Немає ключа для картинок (OPENROUTER_API_KEY або OPENAI_API_KEY) — будуть заглушки.');
   else console.log(`   Картинки: ${PROVIDER}`);

@@ -22,19 +22,50 @@
           <h1>Історії на двох</h1>
           <p class="tagline">Обери історію і проживи її по-своєму. Після кожної сцени ти вирішуєш, що буде далі.</p>
         </div>
-        <button id="keysToggle" class="icon-chip" type="button" aria-label="Ключі API">🔑</button>
+        <button id="keysToggle" class="icon-chip" type="button" aria-label="Налаштування">⚙️</button>
       </header>
 
       <div id="keysBox" class="keys" hidden>
         <form id="keysForm">
-          <h2>Ключі API</h2>
-          <p class="keys-sub">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic та OpenRouter.</p>
-          <label for="keyAnthropic">Anthropic (сюжет) — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">отримати</a></label>
-          <input id="keyAnthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
-          <label for="keyOpenrouter">OpenRouter (фото) — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">отримати</a></label>
-          <input id="keyOpenrouter" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…" />
-          <label for="keyImageModel">Модель фото на OpenRouter (необов'язково)</label>
-          <input id="keyImageModel" type="text" autocomplete="off" spellcheck="false" placeholder="google/gemini-2.5-flash-image" />
+          <h2>Налаштування</h2>
+
+          <fieldset class="set-group" id="setText">
+            <legend>Текст історії</legend>
+            <div class="seg" role="radiogroup" aria-label="Модель для тексту">
+              <label><input type="radio" name="textProvider" value="claude" checked /> <span>Claude</span></label>
+              <label><input type="radio" name="textProvider" value="grok" /> <span>Grok</span></label>
+            </div>
+            <div id="claudeFields" class="set-fields">
+              <label for="keyAnthropic">Ключ Anthropic — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">отримати</a></label>
+              <input id="keyAnthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
+            </div>
+            <div id="grokFields" class="set-fields" hidden>
+              <label for="keyXai">Ключ xAI (Grok) — <a href="https://console.x.ai" target="_blank" rel="noopener">отримати</a></label>
+              <input id="keyXai" type="password" autocomplete="off" spellcheck="false" placeholder="xai-…" />
+              <label for="grokModel">Модель Grok</label>
+              <input id="grokModel" type="text" autocomplete="off" spellcheck="false" />
+            </div>
+          </fieldset>
+
+          <fieldset class="set-group" id="setImages">
+            <legend>Фото</legend>
+            <label for="keyOpenrouter">Ключ OpenRouter — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">отримати</a></label>
+            <input id="keyOpenrouter" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…" />
+            <label for="keyImageModel">Модель фото на OpenRouter</label>
+            <input id="keyImageModel" type="text" autocomplete="off" spellcheck="false" />
+          </fieldset>
+
+          <fieldset class="set-group">
+            <legend>Промпти</legend>
+            <label for="promptStory">Промпт сюжету (для Claude або Grok)</label>
+            <textarea id="promptStory" rows="12" spellcheck="false"></textarea>
+            <label for="promptImage">Стиль фото (англійською, для моделі фото)</label>
+            <textarea id="promptImage" rows="4" spellcheck="false"></textarea>
+            <p class="keys-sub">До цих промптів автоматично додаються формат відповіді й межі контенту: усі персонажі дорослі, без відвертих сцен, люди на фото вдягнені. Ці правила не редагуються.</p>
+            <button type="button" id="promptsReset" class="link-btn">Скинути промпти до стандартних</button>
+          </fieldset>
+
+          <p class="keys-sub" id="keysNote">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic, xAI та OpenRouter.</p>
           <div id="keysStatus" class="keys-status" aria-live="polite"></div>
           <button type="button" id="keysCheck" class="btn btn-ghost">Перевірити ключі</button>
           <button type="submit" class="btn btn-accent">Зберегти</button>

@@ -1,7 +1,10 @@
-// Writes the next chapter (5 slides) with Claude.
+// Writes the next chapter with Claude.
 // writeChapterWith() takes any Anthropic client, so the browser-only build reuses it.
 import Anthropic from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT, CHAPTER_SCHEMA, MAX_SLIDES, buildUserMessage } from './prompts.js';
+import { CHAPTER_SCHEMA, buildSystemPrompt, buildUserMessage } from './prompts.js';
+import { StoryError, parseChapter, slidesSoFar } from './chapter.js';
+
+export { StoryError };
 
 const env = globalThis.process?.env ?? {};
 
@@ -11,13 +14,6 @@ export const DEFAULTS = {
   fallbacks: env.CLAUDE_FALLBACKS !== '0',
 };
 
-export class StoryError extends Error {
-  constructor(message, status = 500) {
-    super(message);
-    this.status = status;
-  }
-}
-
 // The API's own reason, e.g. "invalid x-api-key" or "Your credit balance is too low".
 export function apiErrorDetail(err) {
   const msg = err?.error?.error?.message || '';
@@ -26,12 +22,18 @@ export function apiErrorDetail(err) {
 
 // Streams the answer: bytes keep flowing while Claude thinks (an idle connection on a phone
 // network can stall for minutes), and onProgress can report how far the chapter has got.
-export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, { onProgress, signal, timeout } = {}) {
+export async function writeChapterWith(
+  client,
+  story,
+  prompt,
+  opts = DEFAULTS,
+  { onProgress, signal, timeout, storyPrompt } = {},
+) {
   const { model, effort } = opts;
   const request = {
     model,
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(storyPrompt),
     output_config: {
       effort,
       format: { type: 'json_schema', schema: CHAPTER_SCHEMA },
@@ -50,11 +52,7 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, {
     const stream = client.beta.messages.stream(request, { signal, ...(timeout ? { timeout } : {}) });
     if (onProgress) {
       onProgress({ phase: 'thinking', slides: 0 });
-      stream.on('text', (_delta, snapshot) => {
-        // Each slide object carries one "narration" key, so counting them tracks progress.
-        const slides = Math.min(MAX_SLIDES, (snapshot.match(/"narration"/g) || []).length);
-        onProgress({ phase: 'writing', slides });
-      });
+      stream.on('text', (_delta, snapshot) => onProgress({ phase: 'writing', slides: slidesSoFar(snapshot) }));
     }
     response = await stream.finalMessage();
   } catch (err) {
@@ -99,26 +97,12 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, {
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('');
-
-  let chapter;
-  try {
-    chapter = JSON.parse(text);
-  } catch {
-    console.error('[claude] unparseable output:', text.slice(0, 500));
-    throw new StoryError('Не вдалося прочитати сценарій від Claude. Спробуй ще раз.', 502);
-  }
-
-  if (!Array.isArray(chapter.slides) || chapter.slides.length === 0) {
-    throw new StoryError('Claude повернув порожній розділ. Спробуй ще раз.', 502);
-  }
-  chapter.slides = chapter.slides.slice(0, MAX_SLIDES);
-  chapter.next_options = (chapter.next_options || []).slice(0, 3);
-  return chapter;
+  return parseChapter(text, 'Claude');
 }
 
 // Server entry point: credentials come from the environment.
 let serverClient;
-export function writeChapter(story, prompt) {
+export function writeChapter(story, prompt, { storyPrompt } = {}) {
   serverClient ??= new Anthropic();
-  return writeChapterWith(serverClient, story, prompt, DEFAULTS);
+  return writeChapterWith(serverClient, story, prompt, DEFAULTS, { storyPrompt });
 }

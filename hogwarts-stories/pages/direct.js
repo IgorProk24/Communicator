@@ -2,10 +2,11 @@
 // stay in this browser's localStorage. Bundled to docs/engine.js by scripts/build-pages.mjs.
 import Anthropic from '@anthropic-ai/sdk';
 import { writeChapterWith, DEFAULTS, apiErrorDetail } from '../server/story.js';
-import { buildImagePrompt, buildPortraitPrompt } from '../server/prompts.js';
+import { buildImagePrompt, buildPortraitPrompt, STORY_PROMPT, IMAGE_STYLE } from '../server/prompts.js';
+import { writeChapterGrok, GROK_URL, GROK_DEFAULT_MODEL } from '../server/grok.js';
 
 const KEYS = 'hogwarts-stories:keys';
-const IMAGE_MODEL = 'google/gemini-2.5-flash-image';
+const IMAGE_MODEL = 'bytedance-seed/seedream-5.0-pro';
 
 function readKeys() {
   try {
@@ -102,27 +103,37 @@ class HttpError extends Error {
 const BROWSER_OPTS = { ...DEFAULTS, effort: 'low' };
 const CHAPTER_TIMEOUT_MS = 180_000;
 
-async function chapter({ story, prompt }, { onProgress, signal } = {}) {
-  const { anthropic } = readKeys();
-  if (!anthropic) throw new HttpError('Спершу додай ключ Anthropic у налаштуваннях (🔑).', 400);
-  const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true, maxRetries: 1 });
+// The text model is chosen in Settings: Claude (default) or Grok.
+async function chapter({ story, prompt, prompts }, { onProgress, signal } = {}) {
+  const keys = readKeys();
+  const storyPrompt = prompts?.story;
   try {
-    return await writeChapterWith(client, story, prompt, BROWSER_OPTS, { onProgress, signal, timeout: CHAPTER_TIMEOUT_MS });
+    if (keys.textProvider === 'grok') {
+      if (!keys.xai) throw new HttpError('Спершу додай ключ xAI (Grok) у налаштуваннях (⚙️).', 400);
+      return await writeChapterGrok({
+        apiKey: keys.xai, model: keys.grokModel, story, prompt, storyPrompt, onProgress, signal, timeout: CHAPTER_TIMEOUT_MS,
+      });
+    }
+    if (!keys.anthropic) throw new HttpError('Спершу додай ключ Anthropic у налаштуваннях (⚙️).', 400);
+    const client = new Anthropic({ apiKey: keys.anthropic, dangerouslyAllowBrowser: true, maxRetries: 1 });
+    return await writeChapterWith(client, story, prompt, BROWSER_OPTS, { onProgress, signal, timeout: CHAPTER_TIMEOUT_MS, storyPrompt });
   } catch (err) {
-    throw new HttpError(err.message || 'Помилка Claude.', err.status);
+    if (err instanceof HttpError) throw err;
+    throw new HttpError(err.message || 'Помилка генерації тексту.', err.status);
   }
 }
 
 // Draws a slide, or (with `portrait`) the heroine's reference portrait. A `reference` portrait is
 // sent along with every slide so the image model keeps her face the same across the story.
-async function image({ slide, characters, heroine, reference, portrait }) {
+async function image({ slide, characters, heroine, reference, portrait, prompts }) {
   const keys = readKeys();
   const { openrouter } = keys;
-  if (!openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (🔑).', 400);
+  if (!openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (⚙️).', 400);
+  const style = prompts?.imageStyle;
   const refData = reference ? await resolveUrl(reference).catch(() => null) : null;
   const prompt = portrait
-    ? buildPortraitPrompt(portrait)
-    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData) });
+    ? buildPortraitPrompt(portrait, { style })
+    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData), style });
   const content = refData
     ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: refData } }]
     : prompt;
@@ -159,14 +170,25 @@ async function image({ slide, characters, heroine, reference, portrait }) {
 }
 
 // Checks both keys without generating anything: Anthropic lists models, OpenRouter reads key info.
-async function checkKeys({ anthropic, openrouter }) {
+async function checkKeys({ anthropic, openrouter, xai, textProvider }) {
   const result = {};
-  try {
+  if (textProvider === 'grok') {
+    try {
+      const res = await fetch(`${GROK_URL}/models`, { headers: { Authorization: `Bearer ${xai}` } });
+      const data = await res.json().catch(() => ({}));
+      const why = typeof data?.error === 'string' ? data.error : data?.error?.message;
+      result.text = res.ok
+        ? { ok: true, message: 'Ключ xAI (Grok) працює.' }
+        : { ok: false, message: `xAI: помилка ${res.status}${why ? ': ' + why : ''}` };
+    } catch (err) {
+      result.text = { ok: false, message: `xAI: немає з'єднання (${err?.message || 'мережа'})` };
+    }
+  } else try {
     const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true, maxRetries: 0 });
     await client.models.list({ limit: 1 });
-    result.anthropic = { ok: true, message: 'Ключ Anthropic працює.' };
+    result.text = { ok: true, message: 'Ключ Anthropic (Claude) працює.' };
   } catch (err) {
-    result.anthropic = {
+    result.text = {
       ok: false,
       message: err?.status
         ? `Anthropic: помилка ${err.status}${apiErrorDetail(err)}`
@@ -193,9 +215,12 @@ async function checkKeys({ anthropic, openrouter }) {
 
 window.__directBackend = {
   checkKeys,
+  // Defaults shown in Settings; the user's own versions travel with each request as `prompts`.
+  defaults: { story: STORY_PROMPT, imageStyle: IMAGE_STYLE, imageModel: IMAGE_MODEL, grokModel: GROK_DEFAULT_MODEL },
   hasKeys() {
     const k = readKeys();
-    return Boolean(k.anthropic && k.openrouter);
+    const textKey = k.textProvider === 'grok' ? k.xai : k.anthropic;
+    return Boolean(textKey && k.openrouter);
   },
   getKeys: readKeys,
   setKeys(keys) {

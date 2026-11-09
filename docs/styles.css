@@ -107,6 +107,17 @@ h1 { margin: 0 0 6px; font: 700 40px/1.05 var(--font-display); letter-spacing: 0
 .keys label { font-size: 14px; margin-top: 6px; }
 .keys input { font: 15px/1.3 ui-monospace, Menlo, monospace; padding: 11px 12px; }
 .keys .btn { margin-top: 8px; }
+.set-group { display: grid; gap: 8px; margin: 6px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+.set-group legend { padding: 0 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.set-group label { margin-top: 2px; }
+.set-group textarea { font: 13.5px/1.5 ui-monospace, Menlo, monospace; resize: vertical; }
+.set-fields { display: grid; gap: 8px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); }
+.seg label { margin: 0; position: relative; text-align: center; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; padding: 9px 0; border-radius: 999px; font-weight: 700; color: var(--muted); }
+.seg input:checked + span { background: linear-gradient(180deg, var(--accent), var(--accent-deep)); color: #2b120d; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .keys-status { display: grid; gap: 6px; font-size: 14px; line-height: 1.4; }
 .keys-status:empty { display: none; }
 .keys-status p { margin: 0; padding: 8px 10px; border-radius: 8px; overflow-wrap: anywhere; }

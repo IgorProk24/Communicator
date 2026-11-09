@@ -10,7 +10,8 @@ export const PROVIDER =
   (process.env.OPENROUTER_API_KEY ? 'openrouter' : process.env.OPENAI_API_KEY ? 'openai' : 'none');
 
 const OPENROUTER_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const OPENROUTER_MODEL = process.env.OPENROUTER_IMAGE_MODEL || 'google/gemini-2.5-flash-image';
+export const DEFAULT_IMAGE_MODEL = 'bytedance-seed/seedream-5.0-pro';
+const OPENROUTER_MODEL = process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
 const OPENAI_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 const OPENAI_QUALITY = process.env.OPENAI_IMAGE_QUALITY || 'low'; // low | medium | high
 const CONCURRENCY = Math.max(1, Number(process.env.IMAGE_CONCURRENCY) || (PROVIDER === 'openrouter' ? 5 : 3));

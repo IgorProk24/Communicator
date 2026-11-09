@@ -303,7 +303,7 @@ function ensurePortrait(id) {
   lib[id] ||= {};
   if (lib[id].portrait?.status === 'done') return Promise.resolve(lib[id].portrait.url);
   if (!portraitJobs.has(id)) {
-    const job = api('/api/image', { portrait: preset(id).heroine, seed: CATALOG.findIndex((p) => p.id === id) })
+    const job = api('/api/image', { portrait: preset(id).heroine, prompts: customPrompts(), seed: CATALOG.findIndex((p) => p.id === id) })
       .then(({ url }) => {
         lib[id] ||= {};
         lib[id].portrait = { status: 'done', url };
@@ -330,7 +330,7 @@ async function generateChapter(id, prompt) {
   const signal = setLoading(true);
   const portrait = ensurePortrait(id); // made while Claude writes
   try {
-    const data = await api('/api/chapter', { story: storyForApi(id), prompt }, { signal, onProgress: showProgress });
+    const data = await api('/api/chapter', { story: storyForApi(id), prompt, prompts: customPrompts() }, { signal, onProgress: showProgress });
     const st = (lib[id] ||= {});
     st.chapters ||= [];
     if (Array.isArray(data.characters) && data.characters.length) st.characters = data.characters;
@@ -372,6 +372,7 @@ async function drawImage(id, c, s) {
       characters: st.characters || [],
       heroine: preset(id).heroine,
       reference: st.portrait?.status === 'done' ? st.portrait.url : null,
+      prompts: customPrompts(),
       seed: c * SEED_STRIDE + s,
     });
     await preload(await displayUrl(url));
@@ -558,57 +559,120 @@ els.askForm.addEventListener('submit', async (e) => {
   await generateChapter(currentId, prompt);
 });
 
-// ---------- API keys (GitHub Pages build only) ----------
-function setupKeys() {
-  const toggle = $('keysToggle');
-  if (!backend) return toggle.remove();
+// ---------- Settings ----------
+// Custom prompts live in this browser and travel with every request; empty means "use the default".
+const PROMPTS_KEY = 'stories-for-two:prompts';
+let defaults = backend?.defaults || { story: '', imageStyle: '' };
+function loadPrompts() {
+  try {
+    return JSON.parse(localStorage.getItem(PROMPTS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+function customPrompts() {
+  const p = loadPrompts();
+  const out = {};
+  if (p.story?.trim()) out.story = p.story;
+  if (p.imageStyle?.trim()) out.imageStyle = p.imageStyle;
+  return out;
+}
+
+function setupSettings() {
   const box = $('keysBox');
   const form = $('keysForm');
-  const a = $('keyAnthropic');
-  const o = $('keyOpenrouter');
-  const m = $('keyImageModel');
   const status = $('keysStatus');
   const checkBtn = $('keysCheck');
-  const showKeys = (open) => {
-    box.hidden = !open;
-    if (!open) return;
-    const k = backend.getKeys();
-    a.value = k.anthropic || '';
-    o.value = k.openrouter || '';
-    m.value = k.imageModel || '';
+  const f = {
+    anthropic: $('keyAnthropic'), xai: $('keyXai'), grokModel: $('grokModel'),
+    openrouter: $('keyOpenrouter'), imageModel: $('keyImageModel'),
+    story: $('promptStory'), imageStyle: $('promptImage'),
+  };
+  const providerInputs = [...form.querySelectorAll('input[name=textProvider]')];
+  const provider = () => providerInputs.find((r) => r.checked)?.value || 'claude';
+  const syncProvider = () => {
+    $('claudeFields').hidden = provider() !== 'claude';
+    $('grokFields').hidden = provider() !== 'grok';
+  };
+  providerInputs.forEach((r) => r.addEventListener('change', syncProvider));
+
+  // The server build keeps keys and the text model in .env; only prompts are set here.
+  if (!backend) {
+    for (const id of ['setText', 'setImages', 'keysNote', 'keysCheck']) $(id).hidden = true;
+  }
+
+  const fill = () => {
+    if (backend) {
+      const k = backend.getKeys();
+      providerInputs.forEach((r) => (r.checked = r.value === (k.textProvider || 'claude')));
+      f.anthropic.value = k.anthropic || '';
+      f.xai.value = k.xai || '';
+      f.grokModel.value = k.grokModel || '';
+      f.grokModel.placeholder = defaults.grokModel || '';
+      f.openrouter.value = k.openrouter || '';
+      f.imageModel.value = k.imageModel || '';
+      f.imageModel.placeholder = defaults.imageModel || '';
+      syncProvider();
+    }
+    const p = loadPrompts();
+    f.story.value = p.story?.trim() ? p.story : defaults.story;
+    f.imageStyle.value = p.imageStyle?.trim() ? p.imageStyle : defaults.imageStyle;
     status.replaceChildren();
   };
-  showKeys(!backend.hasKeys());
-  toggle.addEventListener('click', () => showKeys(box.hidden));
+  const open = (on) => {
+    box.hidden = !on;
+    if (on) fill();
+  };
+  open(Boolean(backend) && !backend.hasKeys());
+  $('keysToggle').addEventListener('click', () => open(box.hidden));
+
+  $('promptsReset').addEventListener('click', () => {
+    f.story.value = defaults.story;
+    f.imageStyle.value = defaults.imageStyle;
+    toast('Повернуто стандартні промпти. Натисни «Зберегти».', true);
+  });
+
   checkBtn.addEventListener('click', async () => {
-    const anthropic = a.value.trim();
-    const openrouter = o.value.trim();
-    if (!anthropic || !openrouter) return toast('Встав обидва ключі, потім перевір.');
+    const keys = { anthropic: f.anthropic.value.trim(), xai: f.xai.value.trim(), openrouter: f.openrouter.value.trim(), textProvider: provider() };
+    const textKey = keys.textProvider === 'grok' ? keys.xai : keys.anthropic;
+    if (!textKey || !keys.openrouter) return toast('Встав ключ для тексту й ключ OpenRouter, потім перевір.');
     checkBtn.disabled = true;
     checkBtn.textContent = 'Перевіряю…';
     status.replaceChildren();
     try {
-      const r = await backend.checkKeys({ anthropic, openrouter });
-      status.replaceChildren(
-        ...[r.anthropic, r.openrouter].map((x) => el('p', x.ok ? 'ok' : 'bad', (x.ok ? '✅ ' : '❌ ') + x.message)),
-      );
+      const r = await backend.checkKeys(keys);
+      status.replaceChildren(...[r.text, r.openrouter].map((x) => el('p', x.ok ? 'ok' : 'bad', (x.ok ? '✅ ' : '❌ ') + x.message)));
     } finally {
       checkBtn.disabled = false;
       checkBtn.textContent = 'Перевірити ключі';
     }
   });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const anthropic = a.value.trim();
-    const openrouter = o.value.trim();
-    if (!anthropic || !openrouter) return toast('Потрібні обидва ключі.');
+    // A prompt equal to the default is stored as "use default", so future default updates still apply.
+    const story = f.story.value.trim() === (defaults.story || '').trim() ? '' : f.story.value;
+    const imageStyle = f.imageStyle.value.trim() === (defaults.imageStyle || '').trim() ? '' : f.imageStyle.value;
     try {
-      backend.setKeys({ anthropic, openrouter, imageModel: m.value.trim() });
+      localStorage.setItem(PROMPTS_KEY, JSON.stringify({ story, imageStyle }));
+      if (backend) {
+        const keys = {
+          textProvider: provider(),
+          anthropic: f.anthropic.value.trim(),
+          xai: f.xai.value.trim(),
+          grokModel: f.grokModel.value.trim(),
+          openrouter: f.openrouter.value.trim(),
+          imageModel: f.imageModel.value.trim(),
+        };
+        const textKey = keys.textProvider === 'grok' ? keys.xai : keys.anthropic;
+        if (!textKey || !keys.openrouter) return toast('Потрібні ключ для тексту (Claude або Grok) і ключ OpenRouter.');
+        backend.setKeys(keys);
+      }
     } catch {
-      return toast('Браузер не дозволив зберегти ключі (приватний режим?).');
+      return toast('Браузер не дозволив зберегти налаштування (приватний режим?).');
     }
-    showKeys(false);
-    toast('Ключі збережено на цьому пристрої.', true);
+    open(false);
+    toast('Налаштування збережено на цьому пристрої.', true);
     makeMissingPortraits();
     renderLibrary();
   });
@@ -616,11 +680,12 @@ function setupKeys() {
 
 // ---------- Boot ----------
 showHome();
-setupKeys();
+setupSettings();
 if (!backend) {
   fetch('/api/config')
     .then((r) => r.json())
     .then((cfg) => {
+      if (cfg.defaults) defaults = cfg.defaults;
       if (cfg.demo) els.demoNote.textContent = 'Демо-режим: текст і фото — заглушки. Додай ключі API в .env, щоб генерувати по-справжньому.';
       else if (cfg.placeholderImages) els.demoNote.textContent = 'Немає ключа для фото (OPENROUTER_API_KEY або OPENAI_API_KEY) — замість фото будуть заглушки.';
       else return;

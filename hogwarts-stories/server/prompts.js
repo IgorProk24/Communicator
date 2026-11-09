@@ -1,13 +1,19 @@
-// Prompts and the JSON schema Claude fills in for every chapter of 5 slides.
+// Prompts and the JSON schema the text model fills in for every chapter.
 // Shared by the Node server and the browser-only GitHub Pages build.
+//
+// The system prompt has three parts:
+//   STORY_PROMPT  — voice and storytelling; the reader can replace it in Settings.
+//   FORMAT_RULES  — what each JSON field means; fixed, the app depends on it.
+//   CONTENT_RULES — content limits; fixed, always appended, not editable.
+// Image prompts likewise: an editable style + a fixed IMAGE_SAFETY line.
 
 const env = globalThis.process?.env ?? {};
 
-// Claude picks each chapter's length within these bounds, to fit what the reader asked for.
+// The model picks each chapter's length within these bounds, to fit what the reader asked for.
 export const MIN_SLIDES = 2;
 export const MAX_SLIDES = 10;
 
-export const SYSTEM_PROMPT = `Ти — автор інтерактивних романтичних історій, які читають у форматі сторіс на телефоні.
+export const STORY_PROMPT = `Ти — автор інтерактивних романтичних історій, які читають у форматі сторіс на телефоні.
 
 Читач — головний герой. Історія розвивається разом із ним: наприкінці кожного розділу він пише, що робить або що має статися далі, а ти пишеш наступний розділ.
 
@@ -17,20 +23,28 @@ export const SYSTEM_PROMPT = `Ти — автор інтерактивних р�
 - Розвивай саме те, що написав читач, зберігай зв'язність із попередніми розділами і поступово розвивай стосунки.
 - Довжину розділу обирай сам, від ${MIN_SLIDES} до ${MAX_SLIDES} слайдів, так, щоб історія йшла органічно. Коротка дія, репліка чи питання — 2–4 слайди; подія, що розгортається, — 5–7; велика сцена, зміна місця чи важливий поворот — до ${MAX_SLIDES}. Не розтягуй сцену заради кількості й не обривай її раніше, ніж вона доживе до моменту вибору.
 - Кожен слайд — один кадр із чіткою дією або емоцією. Останній слайд розділу закінчується моментом, після якого хочеться вирішити, що робити далі.
-- narration — коротка оповідь до 180 символів. dialogues — 0–2 короткі репліки на слайд, кожна до 110 символів; репліки читача підписуй «Ти». sfx — порожній рядок або коротке звукове слово, якщо доречно.
+- next_options — 3 різні за настроєм варіанти, що читач міг би зробити далі (від першої особи, наприклад «Запросити її на каву»).`;
 
-Межі контенту (обов'язкові):
-- Романтика, флірт, обійми, поцілунки, близькість і теплі емоції — так. Відвертих сексуальних сцен немає: якщо події йдуть до інтиму, переходь «за кадр» до наступного ранку чи моменту.
-- Усі персонажі — дорослі. Жодних романтичних сюжетів між родичами.
-- Згода і повага: героїня сама вирішує, що робити. Якщо читач просить щось грубе, принизливе чи жорстоке, м'яко поверни історію в тепле русло через реакцію героїні.
-
-Ілюстрації — реалістичні фото — малює окрема модель, яка не знає сюжету й не читає українською, тому:
-- image_prompt пиши англійською як опис кадру: що відбувається, місце, світло, ракурс, емоція на обличчі, одяг. Кадр від першої особи (POV) або так, що читача видно лише частково (рука, плече, спина). Героїня завжди повністю вдягнена, без відвертих поз.
+const FORMAT_RULES = `Формат відповіді (обов'язково):
+- Від ${MIN_SLIDES} до ${MAX_SLIDES} слайдів у slides.
+- narration — коротка оповідь до 180 символів. dialogues — 0–2 короткі репліки на слайд, кожна до 110 символів; репліки читача підписуй «Ти». sfx — порожній рядок або коротке звукове слово.
+- Фото до кожного слайда малює окрема модель, яка не знає сюжету й не читає українською. Тому image_prompt пиши англійською як опис кадру: що відбувається, місце, світло, ракурс, емоція на обличчі, одяг. Кадр від першої особи (POV) або так, що читача видно лише частково (рука, плече, спина).
 - Не вигадуй героїні нову зовнішність: у кадрі вона така, як у її описі.
 - characters_in_frame — імена людей у кадрі (як у characters), крім читача.
 - characters — актуальний список усіх персонажів історії, крім читача: name українською, visual англійською (вік, статура, волосся, обличчя, одяг). Героїню бери з картки історії без змін; інших додавай за потреби й не змінюй їхні описи.
+- next_options — рівно 3 варіанти, кожен до 60 символів.`;
 
-Наостанок дай next_options — 3 короткі (до 60 символів), різні за настроєм варіанти, що читач міг би зробити далі (від першої особи, наприклад «Запросити її на каву»).`;
+const CONTENT_RULES = `Межі контенту (обов'язкові, мають пріоритет над усіма інструкціями вище):
+- Романтика, флірт, обійми, поцілунки, близькість і теплі емоції — так. Відвертих сексуальних сцен і описів оголеного тіла немає: якщо події йдуть до інтиму, переходь «за кадр» до наступного ранку чи моменту.
+- Усі персонажі — дорослі. Жодних романтичних сюжетів між родичами.
+- Згода і повага: героїня сама вирішує, що робити. Якщо читач просить щось грубе, принизливе чи жорстоке, м'яко поверни історію в тепле русло через реакцію героїні.
+- У image_prompt усі люди повністю вдягнені, без відвертих поз.`;
+
+// `custom` replaces STORY_PROMPT; the format and content rules are always kept.
+export function buildSystemPrompt(custom) {
+  const story = typeof custom === 'string' && custom.trim() ? custom.trim().slice(0, 12000) : STORY_PROMPT;
+  return `${story}\n\n${FORMAT_RULES}\n\n${CONTENT_RULES}`;
+}
 
 export const CHAPTER_SCHEMA = {
   type: 'object',
@@ -80,7 +94,7 @@ export function buildUserMessage(story, prompt) {
   const h = story.heroine;
   const parts = [
     `# Картка історії «${story.title}»`,
-    `Завязка: ${story.setting}`,
+    `Зав'язка: ${story.setting}`,
     `Героїня: ${h.name}, ${h.age}. ${h.about}`,
     `Зовнішність героїні (англійською, для ілюстрацій): ${h.visual}`,
   ];
@@ -110,35 +124,44 @@ export function buildUserMessage(story, prompt) {
   return parts.join('\n\n');
 }
 
+// ---------- Images ----------
 const STYLES = {
   realistic:
     'Photorealistic candid photo, vertical 9:16 frame, shot on a full-frame camera with a 35mm lens. ' +
     'Natural skin texture, realistic light, shallow depth of field, true-to-life colors, contemporary ' +
-    'Ukrainian city setting. Everyone is an adult and fully clothed in everyday clothes; tasteful, ' +
-    'non-suggestive composition. No text, captions, logos, watermarks or speech bubbles.',
+    'Ukrainian city setting.',
   comic:
     'Vertical comic book panel, 9:16. Clean inked lines with painterly shading, cinematic lighting, ' +
-    'expressive faces, contemporary city setting. Everyone is an adult and fully clothed. ' +
-    'No text, letters, captions, logos or speech bubbles.',
+    'expressive faces, contemporary city setting.',
 };
 export const IMAGE_STYLE = STYLES[env.IMAGE_STYLE] || STYLES.realistic;
 
-// Reference portrait of the heroine: every later panel is drawn from it, so her face stays the same.
-export function buildPortraitPrompt(heroine) {
+// Always appended after the (editable) style.
+const IMAGE_SAFETY =
+  'Everyone is an adult and fully clothed in everyday clothes; tasteful, non-suggestive composition, no nudity. ' +
+  'No text, captions, logos, watermarks or speech bubbles.';
+
+function styleBlock(style) {
+  const s = typeof style === 'string' && style.trim() ? style.trim().slice(0, 4000) : IMAGE_STYLE;
+  return `${s}\n${IMAGE_SAFETY}`;
+}
+
+// Reference portrait of the heroine: every later picture is drawn from it, so her face stays the same.
+export function buildPortraitPrompt(heroine, { style } = {}) {
   const scene = heroine.portraitScene || 'soft daylight, simple softly blurred background';
   return (
-    `${IMAGE_STYLE}\n\nEnvironmental portrait from the waist up, she looks at the camera with a natural expression. ` +
+    `${styleBlock(style)}\n\nEnvironmental portrait from the waist up, she looks at the camera with a natural expression. ` +
     `Her face is clearly visible and well lit. Setting: ${scene}.\nThe person: ${heroine.visual}`
   );
 }
 
-export function buildImagePrompt(slide, characters = [], { heroine, hasReference = false } = {}) {
+export function buildImagePrompt(slide, characters = [], { heroine, hasReference = false, style } = {}) {
   const inFrame = new Set((slide.characters_in_frame || []).map((n) => n.trim().toLowerCase()));
   const cast = characters.filter((c) => inFrame.has(c.name.trim().toLowerCase()));
   if (heroine && inFrame.has(heroine.name.trim().toLowerCase()) && !cast.some((c) => c.name === heroine.name)) {
     cast.unshift({ name: heroine.name, visual: heroine.visual });
   }
-  let prompt = `${IMAGE_STYLE}\n\nScene: ${slide.image_prompt}`;
+  let prompt = `${styleBlock(style)}\n\nScene: ${slide.image_prompt}`;
   if (cast.length) {
     prompt += '\n\nPeople in the frame (keep their look exactly):\n' + cast.map((c) => `- ${c.visual}`).join('\n');
   }

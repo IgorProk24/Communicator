@@ -2,9 +2,10 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeChapter, StoryError } from './story.js';
+import { writeChapterGrokServer } from './grok.js';
 import { drawPanel, ImageError, PROVIDER } from './images.js';
 import { readFile } from 'node:fs/promises';
-import { buildImagePrompt, buildPortraitPrompt } from './prompts.js';
+import { buildImagePrompt, buildPortraitPrompt, STORY_PROMPT, IMAGE_STYLE } from './prompts.js';
 import { mockChapter, mockPanelSvg } from './mock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +14,8 @@ const IMAGES_DIR = path.join(ROOT, 'generated');
 const PORT = Number(process.env.PORT) || 3000;
 const DEMO = process.env.DEMO_MODE === '1';
 const PLACEHOLDER_IMAGES = DEMO || PROVIDER === 'none';
+// Text model: Claude by default, Grok with TEXT_PROVIDER=grok (needs XAI_API_KEY).
+const TEXT_PROVIDER = process.env.TEXT_PROVIDER === 'grok' ? 'grok' : 'claude';
 
 const app = express();
 
@@ -33,7 +36,12 @@ app.use(express.static(path.join(ROOT, 'public')));
 app.use('/generated', express.static(IMAGES_DIR, { maxAge: '30d', immutable: true }));
 
 app.get('/api/config', (_req, res) => {
-  res.json({ demo: DEMO, placeholderImages: PLACEHOLDER_IMAGES });
+  res.json({
+    demo: DEMO,
+    placeholderImages: PLACEHOLDER_IMAGES,
+    textProvider: TEXT_PROVIDER,
+    defaults: { story: STORY_PROMPT, imageStyle: IMAGE_STYLE },
+  });
 });
 
 const clean = (s, max) => (typeof s === 'string' ? s.trim().slice(0, max) : '');
@@ -50,7 +58,9 @@ app.post('/api/chapter', async (req, res) => {
   try {
     const chapter = DEMO
       ? await new Promise((r) => setTimeout(() => r(mockChapter(story, prompt)), 1200))
-      : await writeChapter(story, prompt);
+      : TEXT_PROVIDER === 'grok'
+        ? await writeChapterGrokServer(story, prompt, { storyPrompt: req.body?.prompts?.story })
+        : await writeChapter(story, prompt, { storyPrompt: req.body?.prompts?.story });
     res.json(chapter);
   } catch (err) {
     if (!(err instanceof StoryError)) console.error(err);
@@ -89,7 +99,7 @@ app.post('/api/image', async (req, res) => {
     let prompt;
     let reference = null;
     if (portrait) {
-      prompt = buildPortraitPrompt(portrait);
+      prompt = buildPortraitPrompt(portrait, { style: req.body?.prompts?.imageStyle });
     } else {
       const characters = Array.isArray(req.body?.characters) ? req.body.characters.filter(validPerson) : [];
       const heroine = validPerson(req.body?.heroine) ? req.body.heroine : null;
@@ -97,7 +107,7 @@ app.post('/api/image', async (req, res) => {
       prompt = buildImagePrompt(
         { image_prompt: clean(slide.image_prompt, 4000), characters_in_frame: slide.characters_in_frame || [] },
         characters,
-        { heroine, hasReference: Boolean(reference) },
+        { heroine, hasReference: Boolean(reference), style: req.body?.prompts?.imageStyle },
       );
     }
     const file = await drawPanel(prompt, IMAGES_DIR, reference);
@@ -109,7 +119,7 @@ app.post('/api/image', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✨ Історії на двох: http://localhost:${PORT}`);
+  console.log(`✨ Історії на двох: http://localhost:${PORT}  (текст: ${TEXT_PROVIDER})`);
   if (DEMO) console.log('   Демо-режим: сценарій і картинки — заглушки, ключі API не потрібні.');
   else if (PLACEHOLDER_IMAGES) console.log('   Немає ключа для картинок (OPENROUTER_API_KEY або OPENAI_API_KEY) — будуть заглушки.');
   else console.log(`   Картинки: ${PROVIDER}`);

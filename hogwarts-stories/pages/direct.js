@@ -6,7 +6,8 @@ import { buildImagePrompt, buildPortraitPrompt, STORY_PROMPT, IMAGE_STYLE } from
 import { writeChapterGrok, OPENROUTER_URL, GROK_OPENROUTER_MODEL } from '../server/grok.js';
 
 const KEYS = 'hogwarts-stories:keys';
-const IMAGE_MODEL = 'bytedance-seed/seedream-5.0-pro';
+// Used only until Settings has picked a real ID from OpenRouter's model list.
+const IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 
 function readKeys() {
   try {

@@ -275,8 +275,9 @@ function setLoading(on) {
 }
 
 function showProgress({ phase, slides }) {
+  const who = textModelName();
   els.loadingProgress.textContent =
-    phase === 'thinking' ? 'Обдумуємо сюжет…' : `Пишемо: кадр ${Math.max(1, slides)}`;
+    phase === 'thinking' ? `${who} обдумує сюжет…` : `${who} пише: кадр ${Math.max(1, slides)}`;
 }
 
 // ---------- Generation ----------
@@ -303,7 +304,8 @@ function ensurePortrait(id) {
   lib[id] ||= {};
   if (lib[id].portrait?.status === 'done') return Promise.resolve(lib[id].portrait.url);
   if (!portraitJobs.has(id)) {
-    const job = api('/api/image', { portrait: preset(id).heroine, prompts: customPrompts(), seed: CATALOG.findIndex((p) => p.id === id) })
+    const job = modelsReady
+      .then(() => api('/api/image', { portrait: preset(id).heroine, prompts: customPrompts(), seed: CATALOG.findIndex((p) => p.id === id) }))
       .then(({ url }) => {
         lib[id] ||= {};
         lib[id].portrait = { status: 'done', url };
@@ -328,6 +330,7 @@ function ensurePortrait(id) {
 async function generateChapter(id, prompt) {
   if (busy) return false;
   const signal = setLoading(true);
+  await modelsReady; // saved model IDs are checked first, so the request uses a real one
   const portrait = ensurePortrait(id); // made while Claude writes
   try {
     const data = await api('/api/chapter', { story: storyForApi(id), prompt, prompts: customPrompts() }, { signal, onProgress: showProgress });
@@ -338,6 +341,7 @@ async function generateChapter(id, prompt) {
       prompt,
       title: data.chapter_title || `Розділ ${st.chapters.length + 1}`,
       options: data.next_options || [],
+      writtenBy: textModelName(),
       slides: data.slides.map((s) => ({ ...s, image: { status: 'loading' } })),
     });
     currentId = id;
@@ -367,6 +371,7 @@ async function drawImage(id, c, s) {
   slide.image = { status: 'loading' };
   refreshIfCurrent(id, c, s);
   try {
+    await modelsReady;
     const { url } = await api('/api/image', {
       slide: { image_prompt: slide.image_prompt, characters_in_frame: slide.characters_in_frame },
       characters: st.characters || [],
@@ -424,7 +429,10 @@ function renderBars() {
       return bar;
     }),
   );
-  els.chapterLabel.textContent = `${preset(currentId).heroine.name} · Розділ ${pos.c + 1}: ${ch.title}`;
+  // Which model wrote this chapter, so Claude and Grok chapters are easy to tell apart.
+  els.chapterLabel.replaceChildren();
+  if (ch.writtenBy) els.chapterLabel.append(el('span', 'model-tag', ch.writtenBy));
+  els.chapterLabel.append(`${preset(currentId).heroine.name} · Розділ ${pos.c + 1}: ${ch.title}`);
 }
 
 function renderArt() {
@@ -559,6 +567,81 @@ els.askForm.addEventListener('submit', async (e) => {
   await generateChapter(currentId, prompt);
 });
 
+// ---------- Which models are on ----------
+let serverTextProvider = 'claude';
+function textProvider() {
+  return backend ? backend.getKeys().textProvider || 'claude' : serverTextProvider;
+}
+function textModelName() {
+  return textProvider() === 'grok' ? 'Grok' : 'Claude';
+}
+const shortModel = (id) => (id || '').split('/').pop();
+
+function renderModelChip() {
+  const chip = $('modelChip');
+  const k = backend ? backend.getKeys() : {};
+  chip.replaceChildren('Сюжет: ', el('b', null, textModelName()));
+  if (backend) chip.append(' · Фото: ', el('b', null, shortModel(k.imageModel || backend.defaults.imageModel)));
+  chip.append(backend ? ' ⚙️' : '');
+  chip.hidden = false;
+}
+
+// OpenRouter's public model list: real IDs for the Grok and photo pickers.
+let modelListPromise = null;
+function loadModelList() {
+  modelListPromise ??= fetch('https://openrouter.ai/api/v1/models')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    .then((j) => j.data || [])
+    .catch((err) => {
+      modelListPromise = null; // try again next time
+      throw err;
+    });
+  return modelListPromise;
+}
+const newestFirst = (a, b) => b.id.localeCompare(a.id, 'en', { numeric: true });
+function modelChoices(list) {
+  const outputs = (m) => m.architecture?.output_modalities || [];
+  const grok = list.filter((m) => m.id.startsWith('x-ai/') && !outputs(m).includes('image')).sort(newestFirst);
+  const image = list.filter((m) => outputs(m).includes('image')).sort(newestFirst);
+  return { grok, image };
+}
+// Keep a saved ID if it exists; fix the "grok-4" style without the vendor prefix; otherwise pick a sensible default.
+function resolveModel(saved, models, prefer) {
+  const ids = new Set(models.map((m) => m.id));
+  if (saved && ids.has(saved)) return saved;
+  if (saved && ids.has(`x-ai/${saved}`)) return `x-ai/${saved}`;
+  for (const test of prefer) {
+    const hit = models.find((m) => test.test(m.id));
+    if (hit) return hit.id;
+  }
+  return models[0]?.id || saved || '';
+}
+const GROK_PREFER = [/^x-ai\/grok-4-fast$/, /^x-ai\/grok.*fast/, /^x-ai\/grok-4/, /^x-ai\/grok/];
+const IMAGE_PREFER = [/seedream/i, /gemini.*image/i];
+
+// On the browser build, quietly replace saved model IDs that OpenRouter doesn't know.
+// Generation waits for this, so it never starts with an ID that is about to be replaced.
+let modelsReady = Promise.resolve();
+async function fixSavedModels() {
+  if (!backend || !backend.hasKeys()) return;
+  try {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
+    const { grok, image } = modelChoices(await Promise.race([loadModelList(), timeout]));
+    const k = backend.getKeys();
+    const fixed = {
+      ...k,
+      grokModel: resolveModel(k.grokModel, grok, GROK_PREFER),
+      imageModel: resolveModel(k.imageModel, image, IMAGE_PREFER),
+    };
+    if (fixed.grokModel !== k.grokModel || fixed.imageModel !== k.imageModel) {
+      backend.setKeys(fixed);
+      renderModelChip();
+    }
+  } catch {
+    /* no list: keep what is saved */
+  }
+}
+
 // ---------- Settings ----------
 // Custom prompts live in this browser and travel with every request; empty means "use the default".
 const PROMPTS_KEY = 'stories-for-two:prompts';
@@ -593,6 +676,40 @@ function setupSettings() {
   const syncProvider = () => {
     $('claudeFields').hidden = provider() !== 'claude';
     $('grokFields').hidden = provider() !== 'grok';
+    $('activeText').textContent =
+      provider() === 'grok'
+        ? 'Обрано Grok: нові розділи писатиме Grok через OpenRouter.'
+        : 'Обрано Claude: нові розділи писатиме Claude від Anthropic.';
+  };
+
+  // Fill a <select> with real OpenRouter models, keeping the chosen ID even if it is not listed.
+  const fillSelect = (select, models, chosen) => {
+    select.replaceChildren(
+      ...models.map((m) => {
+        const o = el('option', null, m.name ? `${m.name} (${m.id})` : m.id);
+        o.value = m.id;
+        return o;
+      }),
+    );
+    if (chosen && !models.some((m) => m.id === chosen)) {
+      const o = el('option', null, `${chosen} — не знайдено на OpenRouter`);
+      o.value = chosen;
+      select.prepend(o);
+    }
+    select.value = chosen;
+  };
+  const fillModelPickers = async (k) => {
+    const note = $('modelsNote');
+    try {
+      const { grok, image } = modelChoices(await loadModelList());
+      fillSelect(f.grokModel, grok, resolveModel(k.grokModel, grok, GROK_PREFER));
+      fillSelect(f.imageModel, image, resolveModel(k.imageModel, image, IMAGE_PREFER));
+      note.textContent = `Список з OpenRouter: ${grok.length} версій Grok, ${image.length} моделей фото.`;
+    } catch (err) {
+      fillSelect(f.grokModel, [], k.grokModel || defaults.grokModel);
+      fillSelect(f.imageModel, [], k.imageModel || defaults.imageModel);
+      note.textContent = `Не вдалося завантажити список моделей (${err.message}). Спробуй відкрити налаштування ще раз.`;
+    }
   };
   providerInputs.forEach((r) => r.addEventListener('change', syncProvider));
 
@@ -606,11 +723,8 @@ function setupSettings() {
       const k = backend.getKeys();
       providerInputs.forEach((r) => (r.checked = r.value === (k.textProvider || 'claude')));
       f.anthropic.value = k.anthropic || '';
-      f.grokModel.value = k.grokModel || '';
-      f.grokModel.placeholder = defaults.grokModel || '';
       f.openrouter.value = k.openrouter || '';
-      f.imageModel.value = k.imageModel || '';
-      f.imageModel.placeholder = defaults.imageModel || '';
+      fillModelPickers(k);
       syncProvider();
     }
     const p = loadPrompts();
@@ -624,6 +738,10 @@ function setupSettings() {
   };
   open(Boolean(backend) && !backend.hasKeys());
   $('keysToggle').addEventListener('click', () => open(box.hidden));
+  $('modelChip').addEventListener('click', () => {
+    open(true);
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   $('promptsReset').addEventListener('click', () => {
     f.story.value = defaults.story;
@@ -680,20 +798,25 @@ function setupSettings() {
       return toast('Браузер не дозволив зберегти налаштування (приватний режим?).');
     }
     open(false);
-    toast('Налаштування збережено на цьому пристрої.', true);
+    renderModelChip();
+    toast(`Збережено. Сюжет пише ${textModelName()}.`, true);
     makeMissingPortraits();
     renderLibrary();
   });
 }
 
 // ---------- Boot ----------
+modelsReady = fixSavedModels(); // first: portraits started by showHome() wait for it
 showHome();
 setupSettings();
+renderModelChip();
 if (!backend) {
   fetch('/api/config')
     .then((r) => r.json())
     .then((cfg) => {
       if (cfg.defaults) defaults = cfg.defaults;
+      if (cfg.textProvider) serverTextProvider = cfg.textProvider;
+      renderModelChip();
       if (cfg.demo) els.demoNote.textContent = 'Демо-режим: текст і фото — заглушки. Додай ключі API в .env, щоб генерувати по-справжньому.';
       else if (cfg.placeholderImages) els.demoNote.textContent = 'Немає ключа для фото (OPENROUTER_API_KEY або OPENAI_API_KEY) — замість фото будуть заглушки.';
       else return;

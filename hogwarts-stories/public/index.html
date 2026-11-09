@@ -21,6 +21,7 @@
         <div>
           <h1>Історії на двох</h1>
           <p class="tagline">Обери історію і проживи її по-своєму. Після кожної сцени ти вирішуєш, що буде далі.</p>
+          <button id="modelChip" class="model-chip" type="button" hidden></button>
         </div>
         <button id="keysToggle" class="icon-chip" type="button" aria-label="Налаштування">⚙️</button>
       </header>
@@ -31,18 +32,26 @@
 
           <fieldset class="set-group" id="setText">
             <legend>Текст історії</legend>
-            <div class="seg" role="radiogroup" aria-label="Модель для тексту">
-              <label><input type="radio" name="textProvider" value="claude" checked /> <span>Claude</span></label>
-              <label><input type="radio" name="textProvider" value="grok" /> <span>Grok</span></label>
+            <p class="keys-sub">Хто пише сюжет історій:</p>
+            <div class="pcards" role="radiogroup" aria-label="Модель для тексту">
+              <label class="pcard">
+                <input type="radio" name="textProvider" value="claude" checked />
+                <span><b>Claude</b><small>від Anthropic · потрібен ключ Anthropic</small></span>
+              </label>
+              <label class="pcard">
+                <input type="radio" name="textProvider" value="grok" />
+                <span><b>Grok</b><small>від xAI · через OpenRouter, окремий ключ не потрібен</small></span>
+              </label>
             </div>
+            <p class="active-line" id="activeText"></p>
             <div id="claudeFields" class="set-fields">
               <label for="keyAnthropic">Ключ Anthropic — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">отримати</a></label>
               <input id="keyAnthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
             </div>
             <div id="grokFields" class="set-fields" hidden>
               <p class="keys-sub">Grok працює через OpenRouter, тож окремий ключ не потрібен: використовується ключ OpenRouter із розділу «Фото».</p>
-              <label for="grokModel">Модель Grok на OpenRouter</label>
-              <input id="grokModel" type="text" autocomplete="off" spellcheck="false" />
+              <label for="grokModel">Версія Grok</label>
+              <select id="grokModel"></select>
             </div>
           </fieldset>
 
@@ -50,8 +59,9 @@
             <legend>Фото</legend>
             <label for="keyOpenrouter">Ключ OpenRouter — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">отримати</a></label>
             <input id="keyOpenrouter" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…" />
-            <label for="keyImageModel">Модель фото на OpenRouter</label>
-            <input id="keyImageModel" type="text" autocomplete="off" spellcheck="false" />
+            <label for="keyImageModel">Модель фото</label>
+            <select id="keyImageModel"></select>
+            <p class="keys-sub" id="modelsNote">Список моделей завантажується з OpenRouter…</p>
           </fieldset>
 
           <fieldset class="set-group">

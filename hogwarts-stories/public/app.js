@@ -418,8 +418,12 @@ async function generateChapter(id, prompt) {
     ch.slides[i] = { ...cleanSlide(raw), image: { status: 'loading' } };
     if (i === 0 && !opened) els.loadingProgress.textContent = 'Перший кадр написано, створюємо фото…';
     portrait.then(() => drawImage(id, c, i));
-    // The reader may already be waiting on this frame.
-    if (opened && currentId === id && pos.c === c && !els.viewer.classList.contains('hidden')) renderSlide();
+    // Never redraw the frame being read (that restarts its animations and looks like a reload):
+    // only the progress bars change, unless the reader is waiting on exactly this frame.
+    if (opened && viewing(id, c)) {
+      if (pos.s === i) renderSlide();
+      else renderBars();
+    }
   };
 
   try {
@@ -438,7 +442,15 @@ async function generateChapter(id, prompt) {
     timing.text = Math.round((performance.now() - t0) / 1000);
     saveTiming(timing);
     save();
-    if (opened && currentId === id && pos.c === c) renderSlide();
+    if (opened && viewing(id, c)) {
+      if (pos.s > ch.slides.length - 1) {
+        pos.s = ch.slides.length - 1; // was waiting on a frame that never came
+        renderSlide();
+      } else {
+        renderBars();
+        addEndHint();
+      }
+    }
     await firstFrame; // the overlay stays until frame 1 has its photo
     return true;
   } catch (err) {
@@ -449,9 +461,14 @@ async function generateChapter(id, prompt) {
       firstFrameWaiters.delete(`${id}:${c}`);
     } else if (!opened) {
       firstFrameWaiters.get(`${id}:${c}`)?.(); // show what was written
-    } else if (currentId === id && pos.c === c) {
-      pos.s = Math.min(pos.s, ch.slides.length - 1);
-      renderSlide();
+    } else if (viewing(id, c)) {
+      if (pos.s > ch.slides.length - 1) {
+        pos.s = ch.slides.length - 1;
+        renderSlide();
+      } else {
+        renderBars();
+        addEndHint();
+      }
     }
     save();
     if (!signal.aborted) toast(ch.slides.length ? `Розділ обірвався: ${err.message}` : err.message);
@@ -459,6 +476,16 @@ async function generateChapter(id, prompt) {
   } finally {
     endWork();
   }
+}
+
+// Is the reader looking at this chapter right now?
+function viewing(id, c) {
+  return currentId === id && pos.c === c && !els.viewer.classList.contains('hidden');
+}
+// The chapter finished while the reader is on its last frame: add the "what next" hint without a redraw.
+function addEndHint() {
+  if (!isLastSlideOfStory() || !els.slide.querySelector('.caption, .bubbles') || els.slide.querySelector('.tap-hint')) return;
+  els.slide.append(el('div', 'tap-hint', 'Торкнись, щоб вирішити, що далі →'));
 }
 
 // ---------- Images ----------

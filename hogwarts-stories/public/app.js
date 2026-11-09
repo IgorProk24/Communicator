@@ -584,7 +584,7 @@ function setupSettings() {
   const status = $('keysStatus');
   const checkBtn = $('keysCheck');
   const f = {
-    anthropic: $('keyAnthropic'), xai: $('keyXai'), grokModel: $('grokModel'),
+    anthropic: $('keyAnthropic'), grokModel: $('grokModel'),
     openrouter: $('keyOpenrouter'), imageModel: $('keyImageModel'),
     story: $('promptStory'), imageStyle: $('promptImage'),
   };
@@ -606,7 +606,6 @@ function setupSettings() {
       const k = backend.getKeys();
       providerInputs.forEach((r) => (r.checked = r.value === (k.textProvider || 'claude')));
       f.anthropic.value = k.anthropic || '';
-      f.xai.value = k.xai || '';
       f.grokModel.value = k.grokModel || '';
       f.grokModel.placeholder = defaults.grokModel || '';
       f.openrouter.value = k.openrouter || '';
@@ -633,15 +632,24 @@ function setupSettings() {
   });
 
   checkBtn.addEventListener('click', async () => {
-    const keys = { anthropic: f.anthropic.value.trim(), xai: f.xai.value.trim(), openrouter: f.openrouter.value.trim(), textProvider: provider() };
-    const textKey = keys.textProvider === 'grok' ? keys.xai : keys.anthropic;
-    if (!textKey || !keys.openrouter) return toast('Встав ключ для тексту й ключ OpenRouter, потім перевір.');
+    const keys = {
+      anthropic: f.anthropic.value.trim(),
+      openrouter: f.openrouter.value.trim(),
+      textProvider: provider(),
+      grokModel: f.grokModel.value.trim(),
+      imageModel: f.imageModel.value.trim(),
+    };
+    if (!keys.openrouter || (keys.textProvider === 'claude' && !keys.anthropic)) {
+      return toast(keys.textProvider === 'claude' ? 'Встав ключі Anthropic і OpenRouter, потім перевір.' : 'Встав ключ OpenRouter, потім перевір.');
+    }
     checkBtn.disabled = true;
     checkBtn.textContent = 'Перевіряю…';
     status.replaceChildren();
     try {
       const r = await backend.checkKeys(keys);
-      status.replaceChildren(...[r.text, r.openrouter].map((x) => el('p', x.ok ? 'ok' : 'bad', (x.ok ? '✅ ' : '❌ ') + x.message)));
+      status.replaceChildren(
+        ...[r.text, r.openrouter, ...(r.models || [])].filter(Boolean).map((x) => el('p', x.ok ? 'ok' : 'bad', (x.ok ? '✅ ' : '❌ ') + x.message)),
+      );
     } finally {
       checkBtn.disabled = false;
       checkBtn.textContent = 'Перевірити ключі';
@@ -659,13 +667,13 @@ function setupSettings() {
         const keys = {
           textProvider: provider(),
           anthropic: f.anthropic.value.trim(),
-          xai: f.xai.value.trim(),
           grokModel: f.grokModel.value.trim(),
           openrouter: f.openrouter.value.trim(),
           imageModel: f.imageModel.value.trim(),
         };
-        const textKey = keys.textProvider === 'grok' ? keys.xai : keys.anthropic;
-        if (!textKey || !keys.openrouter) return toast('Потрібні ключ для тексту (Claude або Grok) і ключ OpenRouter.');
+        if (!keys.openrouter || (keys.textProvider === 'claude' && !keys.anthropic)) {
+          return toast(keys.textProvider === 'claude' ? 'Потрібні ключі Anthropic і OpenRouter.' : 'Потрібен ключ OpenRouter.');
+        }
         backend.setKeys(keys);
       }
     } catch {

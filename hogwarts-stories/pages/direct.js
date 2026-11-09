@@ -3,7 +3,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { writeChapterWith, DEFAULTS, apiErrorDetail } from '../server/story.js';
 import { buildImagePrompt, buildPortraitPrompt, STORY_PROMPT, IMAGE_STYLE } from '../server/prompts.js';
-import { writeChapterGrok, GROK_URL, GROK_DEFAULT_MODEL } from '../server/grok.js';
+import { writeChapterGrok, OPENROUTER_URL, GROK_OPENROUTER_MODEL } from '../server/grok.js';
 
 const KEYS = 'hogwarts-stories:keys';
 const IMAGE_MODEL = 'bytedance-seed/seedream-5.0-pro';
@@ -108,10 +108,16 @@ async function chapter({ story, prompt, prompts }, { onProgress, signal } = {}) 
   const keys = readKeys();
   const storyPrompt = prompts?.story;
   try {
+    // Grok runs through OpenRouter: xAI's own API refuses requests made from a web page (CORS),
+    // and the OpenRouter key is already here for the photos.
     if (keys.textProvider === 'grok') {
-      if (!keys.xai) throw new HttpError('Спершу додай ключ xAI (Grok) у налаштуваннях (⚙️).', 400);
+      if (!keys.openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (⚙️).', 400);
       return await writeChapterGrok({
-        apiKey: keys.xai, model: keys.grokModel, story, prompt, storyPrompt, onProgress, signal, timeout: CHAPTER_TIMEOUT_MS,
+        apiKey: keys.openrouter,
+        baseUrl: OPENROUTER_URL,
+        via: 'OpenRouter',
+        model: keys.grokModel || GROK_OPENROUTER_MODEL,
+        story, prompt, storyPrompt, onProgress, signal, timeout: CHAPTER_TIMEOUT_MS,
       });
     }
     if (!keys.anthropic) throw new HttpError('Спершу додай ключ Anthropic у налаштуваннях (⚙️).', 400);
@@ -170,31 +176,9 @@ async function image({ slide, characters, heroine, reference, portrait, prompts 
 }
 
 // Checks both keys without generating anything: Anthropic lists models, OpenRouter reads key info.
-async function checkKeys({ anthropic, openrouter, xai, textProvider }) {
-  const result = {};
-  if (textProvider === 'grok') {
-    try {
-      const res = await fetch(`${GROK_URL}/models`, { headers: { Authorization: `Bearer ${xai}` } });
-      const data = await res.json().catch(() => ({}));
-      const why = typeof data?.error === 'string' ? data.error : data?.error?.message;
-      result.text = res.ok
-        ? { ok: true, message: 'Ключ xAI (Grok) працює.' }
-        : { ok: false, message: `xAI: помилка ${res.status}${why ? ': ' + why : ''}` };
-    } catch (err) {
-      result.text = { ok: false, message: `xAI: немає з'єднання (${err?.message || 'мережа'})` };
-    }
-  } else try {
-    const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true, maxRetries: 0 });
-    await client.models.list({ limit: 1 });
-    result.text = { ok: true, message: 'Ключ Anthropic (Claude) працює.' };
-  } catch (err) {
-    result.text = {
-      ok: false,
-      message: err?.status
-        ? `Anthropic: помилка ${err.status}${apiErrorDetail(err)}`
-        : `Anthropic: немає з'єднання (${err?.message || 'мережа'})`,
-    };
-  }
+// Checks keys without generating anything, and that the chosen OpenRouter models exist.
+async function checkKeys({ anthropic, openrouter, textProvider, grokModel, imageModel }) {
+  const result = { text: null, openrouter: null, models: [] };
   try {
     const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${openrouter}` } });
     const data = await res.json().catch(() => ({}));
@@ -210,17 +194,49 @@ async function checkKeys({ anthropic, openrouter, xai, textProvider }) {
   } catch (err) {
     result.openrouter = { ok: false, message: `OpenRouter: немає з'єднання (${err?.message || 'мережа'})` };
   }
+
+  if (textProvider !== 'grok') {
+    try {
+      const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true, maxRetries: 0 });
+      await client.models.list({ limit: 1 });
+      result.text = { ok: true, message: 'Ключ Anthropic (Claude) працює.' };
+    } catch (err) {
+      result.text = {
+        ok: false,
+        message: err?.status
+          ? `Anthropic: помилка ${err.status}${apiErrorDetail(err)}`
+          : `Anthropic: немає з'єднання (${err?.message || 'мережа'})`,
+      };
+    }
+  }
+
+  // The public model list tells whether the IDs typed in Settings exist.
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models');
+    const ids = new Set(((await res.json())?.data || []).map((m) => m.id));
+    const wanted = [['фото', imageModel || IMAGE_MODEL]];
+    if (textProvider === 'grok') wanted.unshift(['текст (Grok)', grokModel || GROK_OPENROUTER_MODEL]);
+    for (const [what, id] of wanted) {
+      result.models.push(
+        ids.has(id)
+          ? { ok: true, message: `Модель для ${what}: ${id} є на OpenRouter.` }
+          : { ok: false, message: `Модель для ${what}: «${id}» не знайдено на OpenRouter. Скопіюй точний ID зі сторінки моделі на openrouter.ai.` },
+      );
+    }
+  } catch {
+    /* the list is only a hint; skip it if it cannot be loaded */
+  }
   return result;
 }
 
 window.__directBackend = {
   checkKeys,
   // Defaults shown in Settings; the user's own versions travel with each request as `prompts`.
-  defaults: { story: STORY_PROMPT, imageStyle: IMAGE_STYLE, imageModel: IMAGE_MODEL, grokModel: GROK_DEFAULT_MODEL },
+  defaults: { story: STORY_PROMPT, imageStyle: IMAGE_STYLE, imageModel: IMAGE_MODEL, grokModel: GROK_OPENROUTER_MODEL },
   hasKeys() {
     const k = readKeys();
-    const textKey = k.textProvider === 'grok' ? k.xai : k.anthropic;
-    return Boolean(textKey && k.openrouter);
+    // Grok goes through OpenRouter, so it needs no key of its own.
+    return Boolean(k.openrouter && (k.textProvider === 'grok' || k.anthropic));
   },
   getKeys: readKeys,
   setKeys(keys) {

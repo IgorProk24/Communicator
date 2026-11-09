@@ -18,6 +18,17 @@ export function parseChapter(text, who) {
   try {
     chapter = JSON.parse(text);
   } catch {
+    // Some models wrap the JSON in a ```json fence or a sentence: take the outermost object.
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    try {
+      if (start < 0 || end <= start) throw new Error('no object');
+      chapter = JSON.parse(text.slice(start, end + 1));
+    } catch {
+      chapter = null;
+    }
+  }
+  if (!chapter) {
     console.error(`[${who}] unparseable output:`, text.slice(0, 500));
     throw new StoryError(`Не вдалося прочитати сценарій від ${who}. Спробуй ще раз.`, 502);
   }

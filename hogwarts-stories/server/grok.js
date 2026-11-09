@@ -1,4 +1,5 @@
-// Writes the next chapter with Grok (xAI API, OpenAI-compatible chat completions).
+// Writes the next chapter with Grok over an OpenAI-compatible chat completions API:
+// xAI directly (server build) or OpenRouter (browser build: xAI does not accept calls from web pages).
 // Plain fetch + SSE parsing, so the same code runs on the Node server and in the browser build.
 import { CHAPTER_SCHEMA, buildSystemPrompt, buildUserMessage } from './prompts.js';
 import { StoryError, parseChapter, slidesSoFar } from './chapter.js';
@@ -6,6 +7,8 @@ import { StoryError, parseChapter, slidesSoFar } from './chapter.js';
 const env = globalThis.process?.env ?? {};
 export const GROK_URL = 'https://api.x.ai/v1';
 export const GROK_DEFAULT_MODEL = env.GROK_MODEL || 'grok-4';
+export const OPENROUTER_URL = 'https://openrouter.ai/api/v1';
+export const GROK_OPENROUTER_MODEL = 'x-ai/grok-4-fast';
 
 // One signal that fires on the caller's abort or after `ms`.
 function withTimeout(signal, ms) {
@@ -24,15 +27,18 @@ function grokErrorMessage(data) {
   return (typeof e === 'string' ? e : e?.message) || data?.message || '';
 }
 
-export async function writeChapterGrok({ apiKey, model, story, prompt, storyPrompt, onProgress, signal, timeout = 180_000 }) {
-  if (!apiKey) throw new StoryError('Немає ключа xAI (Grok). Додай його в налаштуваннях.', 400);
+export async function writeChapterGrok({
+  apiKey, model, story, prompt, storyPrompt, onProgress, signal, timeout = 180_000,
+  baseUrl = GROK_URL, via = 'xAI',
+}) {
+  if (!apiKey) throw new StoryError(`Немає ключа ${via} для Grok. Додай його в налаштуваннях.`, 400);
   const t = withTimeout(signal, timeout);
   let text = '';
   try {
     onProgress?.({ phase: 'thinking', slides: 0 });
     let res;
     try {
-      res = await fetch(`${GROK_URL}/chat/completions`, {
+      res = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         signal: t.signal,
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -57,9 +63,10 @@ export async function writeChapterGrok({ apiKey, model, story, prompt, storyProm
       const data = await res.json().catch(() => ({}));
       const why = grokErrorMessage(data);
       if (res.status === 401 || res.status === 403) {
-        throw new StoryError(`xAI не прийняв ключ (${res.status}${why ? ': ' + why : ''}).`, 500);
+        throw new StoryError(`${via} не прийняв ключ (${res.status}${why ? ': ' + why : ''}).`, 500);
       }
-      if (res.status === 429) throw new StoryError('Забагато запитів до Grok або закінчились кредити xAI. Спробуй пізніше.', 429);
+      if (res.status === 402) throw new StoryError(`На рахунку ${via} закінчились кредити.`, 402);
+      if (res.status === 429) throw new StoryError(`Забагато запитів до Grok або закінчились кредити ${via}. Спробуй пізніше.`, 429);
       throw new StoryError(`Помилка Grok (${res.status}${why ? ': ' + why.slice(0, 200) : ''}).`, 502);
     }
 

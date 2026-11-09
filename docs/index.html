@@ -40,9 +40,8 @@
               <input id="keyAnthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
             </div>
             <div id="grokFields" class="set-fields" hidden>
-              <label for="keyXai">Ключ xAI (Grok) — <a href="https://console.x.ai" target="_blank" rel="noopener">отримати</a></label>
-              <input id="keyXai" type="password" autocomplete="off" spellcheck="false" placeholder="xai-…" />
-              <label for="grokModel">Модель Grok</label>
+              <p class="keys-sub">Grok працює через OpenRouter, тож окремий ключ не потрібен: використовується ключ OpenRouter із розділу «Фото».</p>
+              <label for="grokModel">Модель Grok на OpenRouter</label>
               <input id="grokModel" type="text" autocomplete="off" spellcheck="false" />
             </div>
           </fieldset>
@@ -65,7 +64,7 @@
             <button type="button" id="promptsReset" class="link-btn">Скинути промпти до стандартних</button>
           </fieldset>
 
-          <p class="keys-sub" id="keysNote">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic, xAI та OpenRouter.</p>
+          <p class="keys-sub" id="keysNote">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic та OpenRouter.</p>
           <div id="keysStatus" class="keys-status" aria-live="polite"></div>
           <button type="button" id="keysCheck" class="btn btn-ghost">Перевірити ключі</button>
           <button type="submit" class="btn btn-accent">Зберегти</button>

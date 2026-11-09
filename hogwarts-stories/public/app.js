@@ -700,7 +700,7 @@ function textProvider() {
 function textModelName() {
   if (textProvider() === 'grok') return 'Grok';
   const m = backend?.getKeys().claudeModel || '';
-  return m.includes('haiku') ? 'Claude Haiku' : m.includes('sonnet') ? 'Claude Sonnet' : 'Claude';
+  return m.includes('haiku') ? 'Claude Haiku' : m.includes('opus') ? 'Claude Opus' : 'Claude Sonnet';
 }
 const shortModel = (id) => (id || '').split('/').pop();
 
@@ -738,7 +738,7 @@ const newestFirst = (a, b) => b.id.localeCompare(a.id, 'en', { numeric: true });
 function modelChoices(list) {
   const outputs = (m) => m.architecture?.output_modalities || [];
   const grok = list.filter((m) => m.id.startsWith('x-ai/') && !outputs(m).includes('image')).sort(newestFirst);
-  const rank = (m) => (/seedream/i.test(m.id) ? 0 : m.id.startsWith('x-ai/') ? 1 : 2);
+  const rank = (m) => (isNanoBanana(m.id) ? (/lite/i.test(m.id) ? 1 : 0) : /seedream/i.test(m.id) ? 2 : m.id.startsWith('x-ai/') ? 3 : 4);
   const image = list.filter((m) => outputs(m).includes('image')).sort((a, b) => rank(a) - rank(b) || newestFirst(a, b));
   return { grok, image };
 }
@@ -754,18 +754,20 @@ function resolveModel(saved, models, prefer) {
   return models[0]?.id || saved || '';
 }
 const outputsOf = (m) => m?.architecture?.output_modalities || [];
+const isNanoBanana = (id) => /gemini.*image/i.test(id);
 function modalitiesFor(id, image) {
   const m = image.find((x) => x.id === id);
   return m && !outputsOf(m).includes('text') ? ['image'] : ['image', 'text'];
 }
 const GROK_PREFER = [/^x-ai\/grok-4-fast$/, /^x-ai\/grok.*fast/, /^x-ai\/grok-4/, /^x-ai\/grok/];
 // Photos: Seedream first; if OpenRouter has none, Grok's image model; then Gemini.
-const IMAGE_PREFER = [/seedream/i, /^x-ai\//, /gemini.*image/i];
+// Photos: Google Nano Banana (Gemini Flash Image) — fast, realistic, keeps the face from the reference.
+// The full model goes before Lite; Seedream and xAI only if OpenRouter has no Nano Banana.
+const IMAGE_PREFER = [/gemini.*flash.*image(?!.*lite)/i, /gemini.*image/i, /seedream/i, /^x-ai\//];
 // Fallback when the main photo model fails: Grok's image model (or Seedream, if Grok is the main one).
+// Fallback when the main photo model fails: another Nano Banana (e.g. Lite), so speed and look stay the same.
 function pickImageFallback(image, primary) {
-  const grokImage = image.find((m) => m.id.startsWith('x-ai/') && m.id !== primary);
-  if (grokImage) return grokImage.id;
-  return image.find((m) => /seedream/i.test(m.id) && m.id !== primary)?.id || '';
+  return image.find((m) => isNanoBanana(m.id) && m.id !== primary)?.id || '';
 }
 
 // On the browser build, quietly replace saved model IDs that OpenRouter doesn't know.
@@ -973,7 +975,7 @@ function setupSettings() {
       providerInputs.forEach((r) => (r.checked = r.value === (k.textProvider || 'claude')));
       f.anthropic.value = k.anthropic || '';
       f.openrouter.value = k.openrouter || '';
-      f.claudeModel.value = k.claudeModel || 'claude-opus-5-5';
+      f.claudeModel.value = k.claudeModel || 'claude-sonnet-5-5';
       fillModelPickers(k);
       syncProvider();
     }
@@ -1135,6 +1137,22 @@ setupLoginScreen(() => {
   modelsReady = fixSavedModels();
   showHome();
 });
+// One-time switch to the faster setup: Claude Sonnet 5.5 for the story, Nano Banana for photos.
+// Later changes in Settings are left alone.
+const FAST_DEFAULTS_KEY = 'stories-for-two:fast-defaults-v1';
+try {
+  if (backend && !localStorage.getItem(FAST_DEFAULTS_KEY)) {
+    const k = backend.getKeys();
+    if (Object.keys(k).length) {
+      // Switch the story to Claude only if an Anthropic key is saved; otherwise keep the current writer.
+      const story = k.anthropic ? { textProvider: 'claude', claudeModel: 'claude-sonnet-5-5' } : {};
+      backend.setKeys({ ...k, ...story, imageModelChosen: false });
+    }
+    localStorage.setItem(FAST_DEFAULTS_KEY, '1');
+  }
+} catch {
+  /* storage blocked: defaults still apply */
+}
 modelsReady = fixSavedModels(); // first: portraits started by showHome() wait for it
 showHome();
 setupSettings();

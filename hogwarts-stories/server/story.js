@@ -9,7 +9,7 @@ export { StoryError };
 const env = globalThis.process?.env ?? {};
 
 export const DEFAULTS = {
-  model: env.CLAUDE_MODEL || 'claude-opus-5-5',
+  model: env.CLAUDE_MODEL || 'claude-sonnet-5-5',
   effort: env.CLAUDE_EFFORT || 'medium',
   fallbacks: env.CLAUDE_FALLBACKS !== '0',
 };

@@ -10,7 +10,7 @@ export const PROVIDER =
   (process.env.OPENROUTER_API_KEY ? 'openrouter' : process.env.OPENAI_API_KEY ? 'openai' : 'none');
 
 const OPENROUTER_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-export const DEFAULT_IMAGE_MODEL = 'bytedance-seed/seedream-5.0-pro';
+export const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 const OPENROUTER_MODEL = process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
 // Tried once when the main model fails, e.g. Grok's image model on OpenRouter.
 const OPENROUTER_FALLBACK = process.env.OPENROUTER_IMAGE_FALLBACK || '';

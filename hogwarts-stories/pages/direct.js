@@ -123,7 +123,7 @@ async function chapter({ story, prompt, prompts }, { onProgress, onSlide, signal
     }
     if (!keys.anthropic) throw new HttpError('Спершу додай ключ Anthropic у налаштуваннях (⚙️).', 400);
     const client = new Anthropic({ apiKey: keys.anthropic, dangerouslyAllowBrowser: true, maxRetries: 1 });
-    const opts = { ...BROWSER_OPTS, model: keys.claudeModel || BROWSER_OPTS.model };
+    const opts = { ...BROWSER_OPTS, model: keys.claudeModel || 'claude-sonnet-5-5' };
     return await writeChapterWith(client, story, prompt, opts, { onProgress, onSlide, signal, timeout: CHAPTER_TIMEOUT_MS, storyPrompt });
   } catch (err) {
     if (err instanceof HttpError) throw err;

@@ -147,12 +147,11 @@ function renderLibrary() {
       card.setAttribute('aria-label', `${p.title}, ${p.heroine.name}`);
       const art = el('div', 'card-art');
       fillPortrait(art, p.id);
+      if (portraitJobs.has(p.id)) art.append(el('span', 'card-making', 'Створюємо фото…'));
       const body = el('div', 'card-body');
-      body.append(
-        el('span', 'card-who', `${p.heroine.name}, ${p.heroine.age}`),
-        el('span', 'card-title', p.title),
-        el('span', 'card-line', p.tagline),
-      );
+      const who = el('span', 'card-who', `${p.heroine.name}, ${p.heroine.age}`);
+      if (p.heroine.trait) who.append(el('span', 'card-trait', p.heroine.trait));
+      body.append(who, el('span', 'card-title', p.title), el('span', 'card-line', p.tagline));
       card.append(art, el('div', 'card-shade'), body, el('span', 'card-badge', chapters ? `Розділ ${chapters}` : 'Нова'));
       card.addEventListener('click', () => openIntro(p.id));
       return card;
@@ -166,7 +165,20 @@ function showHome() {
   els.intro.hidden = true;
   show(els.home);
   currentId = null;
+  makeMissingPortraits();
   renderLibrary();
+}
+
+// Every card should show its heroine: make the portraits that don't exist yet (once each, then cached).
+// A failed one is retried at most once a minute, so a missing key or credit doesn't loop.
+const portraitFailedAt = new Map();
+function makeMissingPortraits() {
+  if (backend && !backend.hasKeys()) return;
+  for (const p of CATALOG) {
+    if (lib[p.id]?.portrait?.status === 'done' || portraitJobs.has(p.id)) continue;
+    if (Date.now() - (portraitFailedAt.get(p.id) || 0) < 60_000) continue;
+    ensurePortrait(p.id);
+  }
 }
 
 // ---------- Story card ----------
@@ -305,8 +317,14 @@ function ensurePortrait(id) {
         if (currentId === id) fillAvatar();
         return url;
       })
-      .catch(() => null) // photos are still made, just without a reference
-      .finally(() => portraitJobs.delete(id));
+      .catch(() => {
+        portraitFailedAt.set(id, Date.now());
+        return null; // photos are still made, just without a reference
+      })
+      .finally(() => {
+        portraitJobs.delete(id);
+        if (!els.home.classList.contains('hidden')) renderLibrary();
+      });
     portraitJobs.set(id, job);
   }
   return portraitJobs.get(id);
@@ -650,6 +668,8 @@ function setupKeys() {
     }
     showKeys(false);
     toast('Ключі збережено на цьому пристрої.', true);
+    makeMissingPortraits();
+    renderLibrary();
   });
 }
 

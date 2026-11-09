@@ -122,9 +122,10 @@ export const IMAGE_STYLE = STYLES[env.IMAGE_STYLE] || STYLES.realistic;
 
 // Reference portrait of the heroine: every later panel is drawn from it, so her face stays the same.
 export function buildPortraitPrompt(heroine) {
+  const scene = heroine.portraitScene || 'soft daylight, simple softly blurred background';
   return (
-    `${IMAGE_STYLE}\n\nPortrait photo, from the waist up, looking at the camera with a natural, warm expression. ` +
-    `Soft daylight, simple softly blurred background.\nThe person: ${heroine.visual}`
+    `${IMAGE_STYLE}\n\nEnvironmental portrait from the waist up, she looks at the camera with a natural expression. ` +
+    `Her face is clearly visible and well lit. Setting: ${scene}.\nThe person: ${heroine.visual}`
   );
 }
 

@@ -1,4 +1,5 @@
-// The story library. Every heroine is an adult; `visual` is English because it feeds the image model.
+// The story library. Every heroine is an adult; `visual` and `portraitScene` are English because they feed
+// the image model. `trait` is shown on the library card.
 export const CATALOG = [
   {
     id: 'old-friend',
@@ -9,6 +10,9 @@ export const CATALOG = [
     opening: 'Я впізнаю її й пропоную зайти на каву, згадати старі часи',
     heroine: {
       name: 'Оля',
+      trait: 'Іронічна',
+      portraitScene:
+        'on Khreshchatyk street in Kyiv at golden-hour evening, city lights and passers-by softly blurred behind her, holding her film camera, playful half-smile',
       age: 26,
       about: 'Іронічна, смілива, працює фотографинею, щойно повернулася зі Львова. Пам\'ятає про тебе більше, ніж ти думаєш.',
       visual:
@@ -25,6 +29,9 @@ export const CATALOG = [
     opening: 'Я запалюю свічки й пропоную Марті разом приготувати вечерю на газовій плиті',
     heroine: {
       name: 'Марта',
+      trait: 'Затишна',
+      portraitScene:
+        'in a cozy Kyiv apartment kitchen lit only by candles during a power outage, warm flickering light, sitting at the table with a mug of tea, shy smile',
       age: 23,
       about: 'Студентка-архітекторка, спершу здається тихою, але має гострий гумор і любить настільні ігри. Не терпить, коли її недооцінюють.',
       visual:
@@ -41,6 +48,9 @@ export const CATALOG = [
     opening: 'Я пропоную їй чай із термоса й питаю, що вона читає',
     heroine: {
       name: 'Софія',
+      trait: 'Загадкова',
+      portraitScene:
+        'in a night train compartment, warm reading lamp, dark window with passing lights, an open book in her hands, glancing up with a curious look',
       age: 27,
       about: 'Лікарка-інтерна, втомлена після чергувань, саркастична, але щира. Їде до Львова на важливу для неї зустріч і нервує.',
       visual:
@@ -57,6 +67,9 @@ export const CATALOG = [
     opening: 'Я замовляю нам піцу й пропоную перемир\'я до кінця дедлайну',
     heroine: {
       name: 'Аліна',
+      trait: 'Запальна',
+      portraitScene:
+        'in an empty modern office at night, laptop glow and the night city skyline through the window behind her, arms crossed, confident challenging smile',
       age: 25,
       about: 'Амбітна, пряма, звикла все контролювати, але за роботою ховає мрію про власну студію дизайну. Обожнює гострі суперечки.',
       visual:
@@ -73,6 +86,9 @@ export const CATALOG = [
     opening: 'Я сміюся, беру її за руку, і ми біжимо ховатися від зливи в найближчу книгарню',
     heroine: {
       name: 'Діана',
+      trait: 'Спонтанна',
+      portraitScene:
+        'on an old Kyiv street in light rain at dusk, glowing bookstore window behind her, wet curls, laughing',
       age: 24,
       about: 'Весела, спонтанна, вчителька англійської й танцівниця сальси. Любить пригоди й перевіряє людей на почуття гумору.',
       visual:

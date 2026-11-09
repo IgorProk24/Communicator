@@ -15,14 +15,23 @@ function readKeys() {
   }
 }
 
-// ---------- Image storage (IndexedDB: photos are too big for localStorage) ----------
+// ---------- Image storage ----------
+// Photos are kept in memory for this visit and, best effort, in IndexedDB so they survive a reload.
+// Storage must never decide whether a photo is shown: iOS Safari (private tabs especially) can
+// refuse IndexedDB writes, sometimes with an error that has no message at all.
+const memory = new Map(); // id -> data URL
+
 let dbPromise;
 function db() {
   dbPromise ??= new Promise((resolve, reject) => {
     const req = indexedDB.open('hogwarts-stories', 1);
     req.onupgradeneeded = () => req.result.createObjectStore('images');
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error || new Error('IndexedDB недоступний'));
+    req.onblocked = () => reject(new Error('IndexedDB заблокований'));
+  }).catch((err) => {
+    dbPromise = null; // allow a later retry
+    throw err;
   });
   return dbPromise;
 }
@@ -32,32 +41,53 @@ async function idb(mode, fn) {
     const tx = d.transaction('images', mode);
     const req = fn(tx.objectStore('images'));
     tx.oncomplete = () => resolve(req.result);
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB: помилка запису'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB: транзакцію перервано'));
   });
 }
 
-// Shrink the PNG the model returns to a ~150 KB JPEG before storing it.
+// Shrink the PNG the model returns to a JPEG data URL (~150-300 KB). Strings store reliably
+// in Safari's IndexedDB, unlike Blobs. If shrinking fails, keep the original.
 async function compress(dataUrl) {
-  const img = new Image();
-  img.src = dataUrl;
-  await img.decode();
-  const scale = Math.min(1, 1080 / img.naturalWidth);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(img.naturalWidth * scale);
-  canvas.height = Math.round(img.naturalHeight * scale);
-  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  try {
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    const scale = Math.min(1, 1080 / img.naturalWidth);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const jpeg = canvas.toDataURL('image/jpeg', 0.85);
+    return jpeg.startsWith('data:image/jpeg') ? jpeg : dataUrl;
+  } catch {
+    return dataUrl;
+  }
 }
 
-const objectUrls = new Map();
+async function storeImage(dataUrl) {
+  const id = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  memory.set(id, dataUrl);
+  idb('readwrite', (s) => s.put(dataUrl, id)).catch((err) => console.warn('[images] not saved:', err));
+  return id;
+}
+
 async function resolveUrl(url) {
   if (!url?.startsWith('idb:')) return url;
-  if (objectUrls.has(url)) return objectUrls.get(url);
-  const blob = await idb('readonly', (s) => s.get(url.slice(4)));
-  if (!blob) throw new Error('Фото не знайдено в пам’яті браузера.');
-  const objectUrl = URL.createObjectURL(blob);
-  objectUrls.set(url, objectUrl);
-  return objectUrl;
+  const id = url.slice(4);
+  if (memory.has(id)) return memory.get(id);
+  const stored = await idb('readonly', (s) => s.get(id)).catch(() => null);
+  if (!stored) throw new Error('Фото не збереглося в браузері — намалюй ще раз.');
+  // Older versions stored Blobs.
+  const src = typeof stored === 'string' ? stored : URL.createObjectURL(stored);
+  memory.set(id, src);
+  return src;
+}
+
+// A readable reason for any thrown value, even a DOMException without a message or a bare null.
+export function describe(err) {
+  if (!err) return 'невідома помилка';
+  return err.message || err.name || String(err);
 }
 
 class HttpError extends Error {
@@ -115,9 +145,7 @@ async function image({ slide, characters }) {
   if (typeof url !== 'string' || !url.startsWith('data:image/')) {
     throw new HttpError('Модель не намалювала цей кадр (модерація або відмова).', 422);
   }
-  const blob = await compress(url);
-  const id = crypto.randomUUID();
-  await idb('readwrite', (s) => s.put(blob, id));
+  const id = await storeImage(await compress(url));
   return { url: `idb:${id}` };
 }
 
@@ -166,8 +194,13 @@ window.__directBackend = {
   },
   resolveUrl,
   async call(path, body, options) {
-    if (path === '/api/chapter') return chapter(body, options);
-    if (path === '/api/image') return image(body);
+    try {
+      if (path === '/api/chapter') return await chapter(body, options);
+      if (path === '/api/image') return await image(body);
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(describe(err), 500);
+    }
     throw new HttpError('Невідомий запит.', 404);
   },
 };

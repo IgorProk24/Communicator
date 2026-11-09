@@ -86,7 +86,7 @@ async function api(path, body, options = {}) {
     try {
       return await backend.call(path, body, options);
     } catch (err) {
-      throw new Error(err?.message || 'Щось пішло не так.');
+      throw new Error(err?.message || err?.name || String(err ?? 'Щось пішло не так.'));
     }
   }
   const res = await fetch(path, {

@@ -24,7 +24,9 @@ export function apiErrorDetail(err) {
   return msg ? `: ${msg.slice(0, 200)}` : '';
 }
 
-export async function writeChapterWith(client, story, prompt, opts = DEFAULTS) {
+// Streams the answer: bytes keep flowing while Claude thinks (an idle connection on a phone
+// network can stall for minutes), and onProgress can report how far the chapter has got.
+export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, { onProgress, signal, timeout } = {}) {
   const { model, effort } = opts;
   const request = {
     model,
@@ -45,7 +47,16 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS) {
 
   let response;
   try {
-    response = await client.beta.messages.create(request);
+    const stream = client.beta.messages.stream(request, { signal, ...(timeout ? { timeout } : {}) });
+    if (onProgress) {
+      onProgress({ phase: 'thinking', slides: 0 });
+      stream.on('text', (_delta, snapshot) => {
+        // Each slide object carries one "narration" key, so counting them tracks progress.
+        const slides = Math.min(SLIDES_PER_CHAPTER, (snapshot.match(/"narration"/g) || []).length);
+        onProgress({ phase: 'writing', slides });
+      });
+    }
+    response = await stream.finalMessage();
   } catch (err) {
     const detail = apiErrorDetail(err);
     if (err instanceof Anthropic.AuthenticationError) {
@@ -53,6 +64,12 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS) {
     }
     if (err instanceof Anthropic.RateLimitError) {
       throw new StoryError('Забагато запитів до Claude. Спробуй за хвилину.', 429);
+    }
+    if (err instanceof Anthropic.APIUserAbortError) {
+      throw new StoryError('Скасовано.', 499);
+    }
+    if (err instanceof Anthropic.APIConnectionTimeoutError) {
+      throw new StoryError('Claude не відповів вчасно. Перевір інтернет і спробуй ще раз.', 504);
     }
     if (err instanceof Anthropic.APIError) {
       console.error('[claude] API error', err.status, err.message);

@@ -68,12 +68,16 @@ class HttpError extends Error {
 }
 
 // ---------- API ----------
-async function chapter({ story, prompt }) {
+// On a phone, speed matters more than the last bit of plot depth: think less, give up after 3 min.
+const BROWSER_OPTS = { ...DEFAULTS, effort: 'low' };
+const CHAPTER_TIMEOUT_MS = 180_000;
+
+async function chapter({ story, prompt }, { onProgress, signal } = {}) {
   const { anthropic } = readKeys();
   if (!anthropic) throw new HttpError('Спершу додай ключ Anthropic у налаштуваннях (🔑).', 400);
-  const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true });
+  const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true, maxRetries: 1 });
   try {
-    return await writeChapterWith(client, story, prompt, DEFAULTS);
+    return await writeChapterWith(client, story, prompt, BROWSER_OPTS, { onProgress, signal, timeout: CHAPTER_TIMEOUT_MS });
   } catch (err) {
     throw new HttpError(err.message || 'Помилка Claude.', err.status);
   }
@@ -161,8 +165,8 @@ window.__directBackend = {
     localStorage.setItem(KEYS, JSON.stringify(keys));
   },
   resolveUrl,
-  async call(path, body) {
-    if (path === '/api/chapter') return chapter(body);
+  async call(path, body, options) {
+    if (path === '/api/chapter') return chapter(body, options);
     if (path === '/api/image') return image(body);
     throw new HttpError('Невідомий запит.', 404);
   },

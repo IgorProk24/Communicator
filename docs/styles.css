@@ -278,6 +278,8 @@ h1 {
   text-align: center; padding: 20px;
 }
 .loading p { margin: 0; font-size: 19px; }
+.loading .loading-time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.loading .loading-cancel { width: auto; margin-top: 18px; padding: 10px 22px; font-size: 15px; }
 .loading .loading-sub { color: var(--muted); font-size: 14px; }
 .wand { position: relative; width: 120px; height: 120px; margin-bottom: 14px; }
 .owl { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; animation: bob 1.4s ease-in-out infinite; }

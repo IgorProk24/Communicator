@@ -81,10 +81,10 @@ function toast(message, ok = false) {
 // GitHub Pages build: pages/direct.js installs a browser-only backend before this script runs.
 const backend = window.__directBackend || null;
 
-async function api(path, body) {
+async function api(path, body, options = {}) {
   if (backend) {
     try {
-      return await backend.call(path, body);
+      return await backend.call(path, body, options);
     } catch (err) {
       throw new Error(err?.message || 'Щось пішло не так.');
     }
@@ -93,6 +93,7 @@ async function api(path, body) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: options.signal,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Помилка сервера (${res.status})`);
@@ -139,17 +140,39 @@ function showViewer() {
 
 // ---------- Chapter generation ----------
 let loadingTimer;
+let loadingAbort = null;
+const loadingProgress = document.getElementById('loadingProgress');
+const loadingTime = document.getElementById('loadingTime');
+document.getElementById('loadingCancel').addEventListener('click', () => loadingAbort?.abort());
+
 function setLoading(on) {
   busy = on;
   clearInterval(loadingTimer);
-  if (!on) return hide(els.loading);
+  if (!on) {
+    loadingAbort = null;
+    return hide(els.loading);
+  }
+  loadingAbort = new AbortController();
+  const started = Date.now();
   let i = 0;
   els.loadingText.textContent = LOADING_LINES[0];
+  loadingProgress.textContent = 'Надсилаємо запит до Claude…';
+  loadingTime.textContent = '0:00';
   show(els.loading);
   loadingTimer = setInterval(() => {
-    i = (i + 1) % LOADING_LINES.length;
-    els.loadingText.textContent = LOADING_LINES[i];
-  }, 2600);
+    const sec = Math.floor((Date.now() - started) / 1000);
+    loadingTime.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    if (sec % 3 === 0) {
+      i = (i + 1) % LOADING_LINES.length;
+      els.loadingText.textContent = LOADING_LINES[i];
+    }
+  }, 1000);
+  return loadingAbort.signal;
+}
+
+function showProgress({ phase, slides }) {
+  loadingProgress.textContent =
+    phase === 'thinking' ? 'Claude обдумує сюжет…' : `Claude пише: слайд ${Math.max(1, slides)} з 5`;
 }
 
 // Only the text the writer needs — no image data.
@@ -168,9 +191,9 @@ function storyForApi() {
 
 async function generateChapter(prompt) {
   if (busy) return false;
-  setLoading(true);
+  const signal = setLoading(true);
   try {
-    const data = await api('/api/chapter', { story: storyForApi(), prompt });
+    const data = await api('/api/chapter', { story: storyForApi(), prompt }, { signal, onProgress: showProgress });
     story ??= { title: '', characters: [], chapters: [] };
     story.title = data.story_title || story.title || 'Без назви';
     if (Array.isArray(data.characters) && data.characters.length) story.characters = data.characters;
@@ -188,7 +211,7 @@ async function generateChapter(prompt) {
     showViewer();
     return true;
   } catch (err) {
-    toast(err.message);
+    if (!signal.aborted) toast(err.message);
     return false;
   } finally {
     setLoading(false);

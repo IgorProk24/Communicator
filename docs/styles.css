@@ -151,6 +151,14 @@ h1 { margin: 0 0 6px; font: 700 40px/1.05 var(--font-display); letter-spacing: 0
 .intro-progress, .intro-form { display: grid; gap: 10px; }
 .intro-form label { font-size: 14px; font-weight: 700; }
 .sheet-close { justify-self: center; }
+.login-sheet { display: grid; gap: 10px; padding: 22px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); }
+.login-sheet h2 { margin: 0; font: 700 32px/1.05 var(--font-display); }
+.login-sheet label { font-size: 14px; font-weight: 700; }
+.login-sheet input, .set-group input[type=password] { width: 100%; font: 16px/1.3 var(--font-body); color: var(--text); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; outline: none; }
+.login-sheet input:focus { border-color: var(--accent); }
+#loginError { color: #ffd3d3; }
+.login-out { display: grid; gap: 8px; }
+.login-out textarea { font: 12px/1.4 ui-monospace, Menlo, monospace; word-break: break-all; }
 
 /* ---------- Viewer ---------- */
 #viewer { display: grid; place-items: center; background: #000; }

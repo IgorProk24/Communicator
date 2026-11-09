@@ -651,6 +651,83 @@ async function fixSavedModels() {
   }
 }
 
+// ---------- Login link (GitHub Pages build) ----------
+// There is no server to keep accounts, so the "login" is a link whose #fragment holds the keys and
+// settings encrypted with the reader's password (PBKDF2-SHA256 → AES-256-GCM). The fragment never
+// leaves the browser: it is not sent to GitHub Pages.
+const LOGIN_PREFIX = '#login=';
+const b64u = {
+  to: (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  from: (str) => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
+};
+async function passwordKey(password, salt) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+async function sealLogin(password, payload) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await passwordKey(password, salt);
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(payload)));
+  return `v1.${b64u.to(salt)}.${b64u.to(iv)}.${b64u.to(data)}`;
+}
+async function openLogin(password, token) {
+  const [v, salt, iv, data] = token.split('.');
+  if (v !== 'v1' || !salt || !iv || !data) throw new Error('Посилання пошкоджене. Створи нове в налаштуваннях.');
+  const key = await passwordKey(password, b64u.from(salt));
+  try {
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64u.from(iv) }, key, b64u.from(data));
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    throw new Error('Невірний пароль.');
+  }
+}
+const loginLinkFor = (token) => `${location.origin}${location.pathname}${LOGIN_PREFIX}${token}`;
+function dropLoginFromUrl() {
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
+// Opened from a saved login link: ask for the password and restore keys, models and prompts.
+function setupLoginScreen(onRestored) {
+  if (!backend || !location.hash.startsWith(LOGIN_PREFIX)) return;
+  const token = location.hash.slice(LOGIN_PREFIX.length);
+  const box = $('login');
+  const pass = $('loginPassIn');
+  const error = $('loginError');
+  box.hidden = false;
+  setTimeout(() => pass.focus(), 50);
+  $('loginSkip').addEventListener('click', () => {
+    box.hidden = true;
+    dropLoginFromUrl();
+  });
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    const btn = e.submitter;
+    if (btn) btn.disabled = true;
+    try {
+      const saved = await openLogin(pass.value, token);
+      if (saved.keys) backend.setKeys(saved.keys);
+      if (saved.prompts) localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved.prompts));
+      box.hidden = true;
+      dropLoginFromUrl();
+      onRestored();
+      toast('Вхід виконано: ключі й налаштування відновлено.', true);
+    } catch (err) {
+      error.textContent = err.message;
+      error.hidden = false;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+}
+
 // ---------- Settings ----------
 // Custom prompts live in this browser and travel with every request; empty means "use the default".
 const PROMPTS_KEY = 'stories-for-two:prompts';
@@ -735,7 +812,7 @@ function setupSettings() {
 
   // The server build keeps keys and the text model in .env; only prompts are set here.
   if (!backend) {
-    for (const id of ['setText', 'setImages', 'keysNote', 'keysCheck']) $(id).hidden = true;
+    for (const id of ['setText', 'setImages', 'setLogin', 'keysNote', 'keysCheck']) $(id).hidden = true;
   }
 
   const fill = () => {
@@ -762,6 +839,34 @@ function setupSettings() {
     open(true);
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+
+  // Login link: encrypt what is saved now with the reader's password.
+  if (backend) {
+    $('loginMake').addEventListener('click', async () => {
+      const p1 = $('loginPass').value;
+      const p2 = $('loginPass2').value;
+      if (p1.length < 8) return toast('Пароль має бути щонайменше 8 символів.');
+      if (p1 !== p2) return toast('Паролі не збігаються.');
+      if (!backend.hasKeys()) return toast('Спершу введи ключі й натисни «Зберегти», потім створи посилання.');
+      const token = await sealLogin(p1, { keys: backend.getKeys(), prompts: loadPrompts() });
+      $('loginLink').value = loginLinkFor(token);
+      $('loginOut').hidden = false;
+      $('loginPass').value = '';
+      $('loginPass2').value = '';
+      toast('Посилання створено. Збережи його в закладках або нотатках.', true);
+    });
+    $('loginCopy').addEventListener('click', async () => {
+      const link = $('loginLink');
+      try {
+        await navigator.clipboard.writeText(link.value);
+        toast('Посилання скопійовано.', true);
+      } catch {
+        link.focus();
+        link.select();
+        toast('Не вдалося скопіювати автоматично: виділи посилання й скопіюй вручну.');
+      }
+    });
+  }
 
   $('promptsReset').addEventListener('click', () => {
     f.story.value = defaults.story;
@@ -828,6 +933,13 @@ function setupSettings() {
 }
 
 // ---------- Boot ----------
+// Opened from a login link: restore keys first, then start as usual.
+setupLoginScreen(() => {
+  $('keysBox').hidden = true;
+  renderModelChip();
+  modelsReady = fixSavedModels();
+  showHome();
+});
 modelsReady = fixSavedModels(); // first: portraits started by showHome() wait for it
 showHome();
 setupSettings();

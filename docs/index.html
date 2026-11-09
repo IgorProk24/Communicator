@@ -74,6 +74,21 @@
             <button type="button" id="promptsReset" class="link-btn">Скинути промпти до стандартних</button>
           </fieldset>
 
+          <fieldset class="set-group" id="setLogin">
+            <legend>Вхід за паролем</legend>
+            <p class="keys-sub">Щоб не вводити ключі заново (у новій вкладці, на іншому телефоні чи після очищення браузера), створи посилання для входу. Ключі й налаштування зашифровані твоїм паролем усередині посилання й нікуди не надсилаються. Збережи посилання в закладках або нотатках, а пароль запам'ятай: без нього посилання не відкриється, і відновити пароль неможливо.</p>
+            <label for="loginPass">Пароль (мінімум 8 символів)</label>
+            <input id="loginPass" type="password" autocomplete="new-password" />
+            <label for="loginPass2">Повтори пароль</label>
+            <input id="loginPass2" type="password" autocomplete="new-password" />
+            <button type="button" id="loginMake" class="btn btn-ghost">Створити посилання для входу</button>
+            <div id="loginOut" class="login-out" hidden>
+              <label for="loginLink">Твоє посилання для входу</label>
+              <textarea id="loginLink" rows="3" readonly></textarea>
+              <button type="button" id="loginCopy" class="btn btn-accent">Скопіювати посилання</button>
+            </div>
+          </fieldset>
+
           <p class="keys-sub" id="keysNote">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic та OpenRouter.</p>
           <div id="keysStatus" class="keys-status" aria-live="polite"></div>
           <button type="button" id="keysCheck" class="btn btn-ghost">Перевірити ключі</button>
@@ -87,6 +102,19 @@
   </main>
 
   <!-- Story card -->
+  <!-- Login from a saved link -->
+  <div id="login" class="sheet-wrap" hidden>
+    <form class="sheet login-sheet" id="loginForm" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <h2 id="loginTitle">Вхід</h2>
+      <p class="sheet-setting">Введи пароль від цього посилання, щоб відновити ключі й налаштування.</p>
+      <label for="loginPassIn">Пароль</label>
+      <input id="loginPassIn" type="password" autocomplete="current-password" />
+      <p class="form-note" id="loginError" hidden></p>
+      <button type="submit" class="btn btn-accent">Увійти</button>
+      <button type="button" class="link-btn sheet-close" id="loginSkip">Пропустити</button>
+    </form>
+  </div>
+
   <div id="intro" class="sheet-wrap" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="introTitle">
       <div class="sheet-cover" id="introCover"></div>

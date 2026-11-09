@@ -1,18 +1,15 @@
 // Writes the next chapter (5 slides) with Claude.
+// writeChapterWith() takes any Anthropic client, so the browser-only build reuses it.
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, CHAPTER_SCHEMA, SLIDES_PER_CHAPTER, buildUserMessage } from './prompts.js';
 
-const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5';
-const EFFORT = process.env.CLAUDE_EFFORT || 'medium';
-// Server-side fallback re-runs a request that a safety classifier declined on another model.
-// Haiku has no server-side fallback, so it is never sent there.
-const USE_FALLBACKS = process.env.CLAUDE_FALLBACKS !== '0' && !MODEL.includes('haiku');
+const env = globalThis.process?.env ?? {};
 
-let client;
-function getClient() {
-  client ??= new Anthropic();
-  return client;
-}
+export const DEFAULTS = {
+  model: env.CLAUDE_MODEL || 'claude-opus-5-5',
+  effort: env.CLAUDE_EFFORT || 'medium',
+  fallbacks: env.CLAUDE_FALLBACKS !== '0',
+};
 
 export class StoryError extends Error {
   constructor(message, status = 500) {
@@ -21,28 +18,31 @@ export class StoryError extends Error {
   }
 }
 
-export async function writeChapter(story, prompt) {
+export async function writeChapterWith(client, story, prompt, opts = DEFAULTS) {
+  const { model, effort } = opts;
   const request = {
-    model: MODEL,
+    model,
     max_tokens: 16000,
     system: SYSTEM_PROMPT,
     output_config: {
-      effort: EFFORT,
+      effort,
       format: { type: 'json_schema', schema: CHAPTER_SCHEMA },
     },
     messages: [{ role: 'user', content: buildUserMessage(story, prompt) }],
   };
-  if (USE_FALLBACKS) {
+  // Server-side fallback re-runs a request that a safety classifier declined on another model.
+  // Haiku has no server-side fallback, so it is never sent there.
+  if (opts.fallbacks && !model.includes('haiku')) {
     request.betas = ['server-side-fallback-2026-07-01'];
     request.fallbacks = 'default';
   }
 
   let response;
   try {
-    response = await getClient().beta.messages.create(request);
+    response = await client.beta.messages.create(request);
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
-      throw new StoryError('Невірний або відсутній ANTHROPIC_API_KEY на сервері.', 500);
+      throw new StoryError('Невірний або відсутній ключ Anthropic API.', 500);
     }
     if (err instanceof Anthropic.RateLimitError) {
       throw new StoryError('Забагато запитів до Claude. Спробуй за хвилину.', 429);
@@ -83,4 +83,11 @@ export async function writeChapter(story, prompt) {
   chapter.slides = chapter.slides.slice(0, SLIDES_PER_CHAPTER);
   chapter.next_options = (chapter.next_options || []).slice(0, 3);
   return chapter;
+}
+
+// Server entry point: credentials come from the environment.
+let serverClient;
+export function writeChapter(story, prompt) {
+  serverClient ??= new Anthropic();
+  return writeChapterWith(serverClient, story, prompt, DEFAULTS);
 }

@@ -70,14 +70,25 @@ function show(node) { node.classList.remove('hidden'); }
 function hide(node) { node.classList.add('hidden'); }
 
 let toastTimer;
-function toast(message) {
+function toast(message, ok = false) {
   els.toast.textContent = message;
+  els.toast.classList.toggle('ok', ok);
   show(els.toast);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => hide(els.toast), 5000);
 }
 
+// GitHub Pages build: pages/direct.js installs a browser-only backend before this script runs.
+const backend = window.__directBackend || null;
+
 async function api(path, body) {
+  if (backend) {
+    try {
+      return await backend.call(path, body);
+    } catch (err) {
+      throw new Error(err?.message || 'Щось пішло не так.');
+    }
+  }
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -86,6 +97,11 @@ async function api(path, body) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Помилка сервера (${res.status})`);
   return data;
+}
+
+// Image URLs from the browser backend ("idb:…") point at photos stored in IndexedDB.
+function displayUrl(url) {
+  return backend ? backend.resolveUrl(url) : Promise.resolve(url);
 }
 
 function renderChips(container, items, textarea) {
@@ -194,7 +210,7 @@ async function drawImage(c, s) {
       characters: story.characters,
       seed: c * 5 + s,
     });
-    await preload(url);
+    await preload(await displayUrl(url));
     slide.image = { status: 'done', url };
   } catch (err) {
     slide.image = { status: 'error', message: err.message };
@@ -242,7 +258,16 @@ function renderArt() {
     node.alt = slide.narration;
     node.draggable = false;
     node.onload = () => node.classList.add('ready');
-    node.src = img.url;
+    displayUrl(img.url).then(
+      (src) => {
+        node.src = src;
+        if (node.complete) node.classList.add('ready');
+      },
+      () => {
+        slide.image = { status: 'error', message: 'Фото загубилося — намалюй ще раз.' };
+        renderArt();
+      },
+    );
     art.replaceChildren(node);
     if (node.complete) node.classList.add('ready');
   } else if (img.status === 'error') {
@@ -290,7 +315,7 @@ function renderSlide() {
 
   // Warm up the next panel so the swipe feels instant.
   const next = currentChapter().slides[pos.s + 1];
-  if (next?.image?.status === 'done') preload(next.image.url);
+  if (next?.image?.status === 'done') displayUrl(next.image.url).then(preload, () => {});
   save();
 }
 
@@ -434,6 +459,40 @@ els.resumeBtn.addEventListener('click', () => {
   );
   showViewer();
 });
+// ---------- API keys (GitHub Pages build only) ----------
+function setupKeys() {
+  const form = document.getElementById('keysForm');
+  if (!backend || !form) return;
+  const box = document.getElementById('keysBox');
+  const toggle = document.getElementById('keysToggle');
+  const a = document.getElementById('keyAnthropic');
+  const o = document.getElementById('keyOpenrouter');
+  const showKeys = (open) => {
+    box.hidden = !open;
+    toggle.hidden = open;
+    if (open) {
+      const k = backend.getKeys();
+      a.value = k.anthropic || '';
+      o.value = k.openrouter || '';
+    }
+  };
+  showKeys(!backend.hasKeys());
+  toggle.addEventListener('click', () => showKeys(true));
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const anthropic = a.value.trim();
+    const openrouter = o.value.trim();
+    if (!anthropic || !openrouter) return toast('Потрібні обидва ключі.');
+    try {
+      backend.setKeys({ anthropic, openrouter });
+    } catch {
+      return toast('Браузер не дозволив зберегти ключі (приватний режим?).');
+    }
+    showKeys(false);
+    toast('Ключі збережено на цьому пристрої.', true);
+  });
+}
+
 els.newStoryBtn.addEventListener('click', () => {
   if (!confirm('Видалити поточну історію й почати нову?')) return;
   story = null;
@@ -445,7 +504,8 @@ els.newStoryBtn.addEventListener('click', () => {
 // ---------- Boot ----------
 renderChips(els.startChips, EXAMPLES, els.startPrompt);
 showHome();
-fetch('/api/config')
+setupKeys();
+if (!backend) fetch('/api/config')
   .then((r) => r.json())
   .then((cfg) => {
     if (cfg.demo) els.demoNote.textContent = 'Демо-режим: сценарій і малюнки — заглушки. Додай ключі API в .env, щоб чаклувати по-справжньому.';

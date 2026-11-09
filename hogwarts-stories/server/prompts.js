@@ -1,4 +1,7 @@
 // Prompts and the JSON schema Claude fills in for every chapter of 5 slides.
+// Shared by the Node server and the browser-only GitHub Pages build.
+
+const env = globalThis.process?.env ?? {};
 
 export const SLIDES_PER_CHAPTER = 5;
 
@@ -115,7 +118,7 @@ const STYLES = {
     'gothic wizarding castle world. Original character designs. Absolutely no text, letters, captions, ' +
     'logos or speech bubbles in the image.',
 };
-export const IMAGE_STYLE = STYLES[process.env.IMAGE_STYLE] || STYLES.realistic;
+export const IMAGE_STYLE = STYLES[env.IMAGE_STYLE] || STYLES.realistic;
 
 export function buildImagePrompt(slide, characters = []) {
   const inFrame = new Set((slide.characters_in_frame || []).map((n) => n.trim().toLowerCase()));

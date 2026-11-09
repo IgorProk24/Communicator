@@ -18,6 +18,18 @@
       <h1>Хроніки Гоґвортсу</h1>
       <p class="tagline">Комікс у форматі сторіс, сюжет якого пишеш ти. Кожні 5 слайдів ти вирішуєш, що буде далі.</p>
 
+      <div id="keysBox" class="keys" hidden>
+        <form id="keysForm">
+          <h2>🔑 Ключі API</h2>
+          <p class="keys-sub">Ключі зберігаються тільки в цьому браузері й надсилаються лише в Anthropic та OpenRouter.</p>
+          <label for="keyAnthropic">Anthropic (сюжет) — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">отримати</a></label>
+          <input id="keyAnthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
+          <label for="keyOpenrouter">OpenRouter (фото) — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">отримати</a></label>
+          <input id="keyOpenrouter" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…" />
+          <button type="submit" class="btn btn-gold">Зберегти</button>
+        </form>
+      </div>
+
       <div id="resumeBox" class="resume hidden">
         <button id="resumeBtn" class="btn btn-gold"></button>
         <button id="newStoryBtn" class="btn btn-ghost">Почати нову історію</button>
@@ -30,6 +42,7 @@
         <button type="submit" class="btn btn-gold">✨ Почати історію</button>
       </form>
       <p id="demoNote" class="note hidden"></p>
+      <button id="keysToggle" class="link-btn keys-toggle" type="button" hidden>🔑 Змінити ключі API</button>
     </div>
   </main>
 

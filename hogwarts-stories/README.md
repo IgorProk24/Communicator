@@ -62,6 +62,14 @@ generated/       намальовані кадри (не в git)
 
 Решту налаштувань (модель, якість картинок, паралельність) дивись у `.env.example`.
 
+## Версія для GitHub Pages (без сервера)
+
+Папка `docs/` у корені репозиторію містить ту саму програму, але без сервера. Claude та OpenRouter викликаються прямо з браузера, а ключі кожен вводить на своєму пристрої (вони зберігаються в `localStorage` і нікуди, крім Anthropic та OpenRouter, не надсилаються). Фото зберігаються в IndexedDB браузера.
+
+Увімкнути: **Settings → Pages → Build and deployment → Deploy from a branch**, гілка `claude/harry-potter-interactive-comic-9wtna3`, папка `/docs`. Адреса: `https://igorprok24.github.io/Communicator/`.
+
+Після змін у `public/` чи `server/` перезбери: `npm run build:pages`.
+
 Окрема версія для claude.ai без сервера й ключів лежить у `claude-artifact/`. Там сюжет і векторні малюнки робить Claude.
 
 > Це некомерційний фан-проєкт для особистого використання. Світ і персонажі Гаррі Поттера належать J.K. Rowling та Warner Bros.

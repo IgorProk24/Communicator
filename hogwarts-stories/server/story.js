@@ -18,6 +18,12 @@ export class StoryError extends Error {
   }
 }
 
+// The API's own reason, e.g. "invalid x-api-key" or "Your credit balance is too low".
+export function apiErrorDetail(err) {
+  const msg = err?.error?.error?.message || '';
+  return msg ? `: ${msg.slice(0, 200)}` : '';
+}
+
 export async function writeChapterWith(client, story, prompt, opts = DEFAULTS) {
   const { model, effort } = opts;
   const request = {
@@ -41,15 +47,16 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS) {
   try {
     response = await client.beta.messages.create(request);
   } catch (err) {
+    const detail = apiErrorDetail(err);
     if (err instanceof Anthropic.AuthenticationError) {
-      throw new StoryError('Невірний або відсутній ключ Anthropic API.', 500);
+      throw new StoryError(`Anthropic не прийняв ключ (401${detail}). Перевір, що ключ скопійовано повністю й він не видалений.`, 500);
     }
     if (err instanceof Anthropic.RateLimitError) {
       throw new StoryError('Забагато запитів до Claude. Спробуй за хвилину.', 429);
     }
     if (err instanceof Anthropic.APIError) {
       console.error('[claude] API error', err.status, err.message);
-      throw new StoryError(`Помилка Claude (${err.status ?? 'мережа'}). Спробуй ще раз.`, 502);
+      throw new StoryError(`Помилка Claude (${err.status ?? 'мережа'}${detail}).`, 502);
     }
     throw err;
   }

@@ -1,7 +1,7 @@
 // Browser-only backend for the GitHub Pages build: no server, the viewer's own API keys
 // stay in this browser's localStorage. Bundled to docs/engine.js by scripts/build-pages.mjs.
 import Anthropic from '@anthropic-ai/sdk';
-import { writeChapterWith, DEFAULTS } from '../server/story.js';
+import { writeChapterWith, DEFAULTS, apiErrorDetail } from '../server/story.js';
 import { buildImagePrompt } from '../server/prompts.js';
 
 const KEYS = 'hogwarts-stories:keys';
@@ -102,7 +102,7 @@ async function image({ slide, characters }) {
       await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
       continue;
     }
-    if (res.status === 401) throw new HttpError('Невірний ключ OpenRouter.', 401);
+    if (res.status === 401) throw new HttpError(`OpenRouter не прийняв ключ (401${data?.error?.message ? ': ' + data.error.message : ''}).`, 401);
     if (res.status === 402) throw new HttpError('На рахунку OpenRouter закінчились кредити.', 402);
     throw new HttpError(data?.error?.message || `OpenRouter: помилка ${res.status}`, res.status);
   }
@@ -117,7 +117,41 @@ async function image({ slide, characters }) {
   return { url: `idb:${id}` };
 }
 
+// Checks both keys without generating anything: Anthropic lists models, OpenRouter reads key info.
+async function checkKeys({ anthropic, openrouter }) {
+  const result = {};
+  try {
+    const client = new Anthropic({ apiKey: anthropic, dangerouslyAllowBrowser: true, maxRetries: 0 });
+    await client.models.list({ limit: 1 });
+    result.anthropic = { ok: true, message: 'Ключ Anthropic працює.' };
+  } catch (err) {
+    result.anthropic = {
+      ok: false,
+      message: err?.status
+        ? `Anthropic: помилка ${err.status}${apiErrorDetail(err)}`
+        : `Anthropic: немає з'єднання (${err?.message || 'мережа'})`,
+    };
+  }
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${openrouter}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      result.openrouter = { ok: false, message: `OpenRouter: помилка ${res.status}${data?.error?.message ? ': ' + data.error.message : ''}` };
+    } else {
+      const left = data?.data?.limit_remaining;
+      result.openrouter = {
+        ok: true,
+        message: 'Ключ OpenRouter працює.' + (typeof left === 'number' ? ` Ліміт ключа: залишилось ${left.toFixed(2)} $.` : ' Переконайся, що на рахунку є кредити.'),
+      };
+    }
+  } catch (err) {
+    result.openrouter = { ok: false, message: `OpenRouter: немає з'єднання (${err?.message || 'мережа'})` };
+  }
+  return result;
+}
+
 window.__directBackend = {
+  checkKeys,
   hasKeys() {
     const k = readKeys();
     return Boolean(k.anthropic && k.openrouter);

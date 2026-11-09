@@ -477,6 +477,25 @@ function setupKeys() {
     }
   };
   showKeys(!backend.hasKeys());
+  const status = document.getElementById('keysStatus');
+  const checkBtn = document.getElementById('keysCheck');
+  checkBtn.addEventListener('click', async () => {
+    const anthropic = a.value.trim();
+    const openrouter = o.value.trim();
+    if (!anthropic || !openrouter) return toast('Встав обидва ключі, потім перевір.');
+    checkBtn.disabled = true;
+    checkBtn.textContent = 'Перевіряю…';
+    status.replaceChildren();
+    try {
+      const r = await backend.checkKeys({ anthropic, openrouter });
+      status.replaceChildren(
+        ...[r.anthropic, r.openrouter].map((x) => el('p', x.ok ? 'ok' : 'bad', (x.ok ? '✅ ' : '❌ ') + x.message)),
+      );
+    } finally {
+      checkBtn.disabled = false;
+      checkBtn.textContent = 'Перевірити ключі';
+    }
+  });
   toggle.addEventListener('click', () => showKeys(true));
   form.addEventListener('submit', (e) => {
     e.preventDefault();

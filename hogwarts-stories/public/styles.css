@@ -111,6 +111,11 @@ h1 {
 }
 .keys input:focus { border-color: var(--gold); }
 .keys .btn { margin-top: 8px; }
+.keys-status { display: grid; gap: 6px; font-size: 14px; line-height: 1.4; }
+.keys-status:empty { display: none; }
+.keys-status p { margin: 0; padding: 8px 10px; border-radius: 8px; overflow-wrap: anywhere; }
+.keys-status .ok { background: rgba(92, 207, 138, 0.12); color: #c9f2d7; }
+.keys-status .bad { background: rgba(255, 122, 122, 0.12); color: #ffd0d0; }
 .keys-toggle { display: block; margin: 18px auto 0; }
 [hidden] { display: none !important; }
 

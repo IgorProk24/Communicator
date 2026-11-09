@@ -617,7 +617,14 @@ function resolveModel(saved, models, prefer) {
   return models[0]?.id || saved || '';
 }
 const GROK_PREFER = [/^x-ai\/grok-4-fast$/, /^x-ai\/grok.*fast/, /^x-ai\/grok-4/, /^x-ai\/grok/];
-const IMAGE_PREFER = [/seedream/i, /gemini.*image/i];
+// Photos: Seedream first; if OpenRouter has none, Grok's image model; then Gemini.
+const IMAGE_PREFER = [/seedream/i, /^x-ai\//, /gemini.*image/i];
+// Fallback when the main photo model fails: Grok's image model (or Seedream, if Grok is the main one).
+function pickImageFallback(image, primary) {
+  const grokImage = image.find((m) => m.id.startsWith('x-ai/') && m.id !== primary);
+  if (grokImage) return grokImage.id;
+  return image.find((m) => /seedream/i.test(m.id) && m.id !== primary)?.id || '';
+}
 
 // On the browser build, quietly replace saved model IDs that OpenRouter doesn't know.
 // Generation waits for this, so it never starts with an ID that is about to be replaced.
@@ -633,7 +640,8 @@ async function fixSavedModels() {
       grokModel: resolveModel(k.grokModel, grok, GROK_PREFER),
       imageModel: resolveModel(k.imageModel, image, IMAGE_PREFER),
     };
-    if (fixed.grokModel !== k.grokModel || fixed.imageModel !== k.imageModel) {
+    fixed.imageFallbackModel = pickImageFallback(image, fixed.imageModel);
+    if (fixed.grokModel !== k.grokModel || fixed.imageModel !== k.imageModel || fixed.imageFallbackModel !== k.imageFallbackModel) {
       backend.setKeys(fixed);
       renderModelChip();
     }
@@ -704,7 +712,10 @@ function setupSettings() {
       const { grok, image } = modelChoices(await loadModelList());
       fillSelect(f.grokModel, grok, resolveModel(k.grokModel, grok, GROK_PREFER));
       fillSelect(f.imageModel, image, resolveModel(k.imageModel, image, IMAGE_PREFER));
-      note.textContent = `Список з OpenRouter: ${grok.length} версій Grok, ${image.length} моделей фото.`;
+      const fallback = pickImageFallback(image, f.imageModel.value);
+      note.textContent =
+        `Список з OpenRouter: ${grok.length} версій Grok, ${image.length} моделей фото. ` +
+        (fallback ? `Якщо обрана модель фото не спрацює, кадр повториться на ${fallback}.` : 'Запасної моделі фото немає.');
     } catch (err) {
       fillSelect(f.grokModel, [], k.grokModel || defaults.grokModel);
       fillSelect(f.imageModel, [], k.imageModel || defaults.imageModel);
@@ -799,6 +810,7 @@ function setupSettings() {
     }
     open(false);
     renderModelChip();
+    modelsReady = fixSavedModels(); // refreshes the fallback for the newly chosen photo model
     toast(`Збережено. Сюжет пише ${textModelName()}.`, true);
     makeMissingPortraits();
     renderLibrary();

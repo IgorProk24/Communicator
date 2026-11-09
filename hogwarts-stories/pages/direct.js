@@ -132,26 +132,15 @@ async function chapter({ story, prompt, prompts }, { onProgress, signal } = {}) 
 
 // Draws a slide, or (with `portrait`) the heroine's reference portrait. A `reference` portrait is
 // sent along with every slide so the image model keeps her face the same across the story.
-async function image({ slide, characters, heroine, reference, portrait, prompts }) {
-  const keys = readKeys();
-  const { openrouter } = keys;
-  if (!openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (⚙️).', 400);
-  const style = prompts?.imageStyle;
-  const refData = reference ? await resolveUrl(reference).catch(() => null) : null;
-  const prompt = portrait
-    ? buildPortraitPrompt(portrait, { style })
-    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData), style });
-  const content = refData
-    ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: refData } }]
-    : prompt;
-
+// One OpenRouter image request with one model; returns the picture as a data URL.
+async function drawWith(model, content, openrouter) {
   let data;
   for (let attempt = 1; ; attempt++) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${openrouter}`, 'Content-Type': 'application/json', 'X-Title': 'Stories for Two' },
       body: JSON.stringify({
-        model: keys.imageModel || IMAGE_MODEL,
+        model,
         messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
         image_config: { aspect_ratio: '9:16' },
@@ -165,12 +154,41 @@ async function image({ slide, characters, heroine, reference, portrait, prompts 
     }
     if (res.status === 401) throw new HttpError(`OpenRouter не прийняв ключ (401${data?.error?.message ? ': ' + data.error.message : ''}).`, 401);
     if (res.status === 402) throw new HttpError('На рахунку OpenRouter закінчились кредити.', 402);
-    throw new HttpError(data?.error?.message || `OpenRouter: помилка ${res.status}`, res.status);
+    throw new HttpError(`${model}: ${data?.error?.message || `помилка ${res.status}`}`, res.status);
   }
-
   const url = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
   if (typeof url !== 'string' || !url.startsWith('data:image/')) {
-    throw new HttpError('Модель не намалювала цей кадр (модерація або відмова).', 422);
+    throw new HttpError(`${model} не намалювала цей кадр (модерація або відмова).`, 422);
+  }
+  return url;
+}
+
+// Draws a slide, or (with `portrait`) the heroine's reference portrait. A `reference` portrait is
+// sent along with every slide so the image model keeps her face the same across the story.
+// The chosen model (Seedream) goes first; if it fails, the fallback (Grok's image model) tries once.
+async function image({ slide, characters, heroine, reference, portrait, prompts }) {
+  const keys = readKeys();
+  const { openrouter } = keys;
+  if (!openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (⚙️).', 400);
+  const style = prompts?.imageStyle;
+  const refData = reference ? await resolveUrl(reference).catch(() => null) : null;
+  const prompt = portrait
+    ? buildPortraitPrompt(portrait, { style })
+    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData), style });
+  const content = refData
+    ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: refData } }]
+    : prompt;
+
+  const primary = keys.imageModel || IMAGE_MODEL;
+  const fallback = keys.imageFallbackModel && keys.imageFallbackModel !== primary ? keys.imageFallbackModel : null;
+  let url;
+  try {
+    url = await drawWith(primary, content, openrouter);
+  } catch (err) {
+    // A bad key or empty balance fails the same way on any model: don't retry those.
+    if (!fallback || err.status === 401 || err.status === 402) throw err;
+    console.warn(`[images] ${primary} failed, trying ${fallback}:`, err.message);
+    url = await drawWith(fallback, content, openrouter);
   }
   const id = await storeImage(await compress(url));
   return { url: `idb:${id}` };

@@ -12,6 +12,8 @@ export const PROVIDER =
 const OPENROUTER_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 export const DEFAULT_IMAGE_MODEL = 'bytedance-seed/seedream-5.0-pro';
 const OPENROUTER_MODEL = process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
+// Tried once when the main model fails, e.g. Grok's image model on OpenRouter.
+const OPENROUTER_FALLBACK = process.env.OPENROUTER_IMAGE_FALLBACK || '';
 const OPENAI_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 const OPENAI_QUALITY = process.env.OPENAI_IMAGE_QUALITY || 'low'; // low | medium | high
 const CONCURRENCY = Math.max(1, Number(process.env.IMAGE_CONCURRENCY) || (PROVIDER === 'openrouter' ? 5 : 3));
@@ -50,7 +52,7 @@ async function withRetry(fn) {
 }
 
 // ---------- OpenRouter ----------
-async function openrouterImage(prompt, reference) {
+async function openrouterImage(prompt, reference, model = OPENROUTER_MODEL) {
   const res = await fetch(`${OPENROUTER_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -59,7 +61,7 @@ async function openrouterImage(prompt, reference) {
       'X-Title': 'Stories for Two',
     },
     body: JSON.stringify({
-      model: OPENROUTER_MODEL,
+      model,
       messages: [
         {
           role: 'user',
@@ -105,12 +107,22 @@ async function openaiImage(prompt) {
 }
 
 // `reference` (a data URL) is passed to OpenRouter so the heroine keeps the same face.
+async function openrouterWithFallback(prompt, reference) {
+  try {
+    return await openrouterImage(prompt, reference);
+  } catch (err) {
+    if (!OPENROUTER_FALLBACK || err?.status === 401 || err?.status === 402) throw err;
+    console.warn(`[openrouter] ${OPENROUTER_MODEL} failed (${err?.message}), trying ${OPENROUTER_FALLBACK}`);
+    return openrouterImage(prompt, reference, OPENROUTER_FALLBACK);
+  }
+}
+
 export async function drawPanel(prompt, outDir, reference = null) {
   return withSlot(async () => {
     let image;
     const started = Date.now();
     try {
-      image = await withRetry(() => (PROVIDER === 'openrouter' ? openrouterImage(prompt, reference) : openaiImage(prompt)));
+      image = await withRetry(() => (PROVIDER === 'openrouter' ? openrouterWithFallback(prompt, reference) : openaiImage(prompt)));
     } catch (err) {
       console.error(`[${PROVIDER}] image error`, err?.status, err?.message);
       if (err?.status === 401 || err?.status === 403) throw new ImageError('Невірний ключ API для картинок на сервері.', 500);

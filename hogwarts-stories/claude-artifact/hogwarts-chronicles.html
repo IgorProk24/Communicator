@@ -1,0 +1,728 @@
+<title>Хроніки Гоґвортсу</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Neucha&family=Philosopher:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one full-height stage in a 9:16 stories frame; home is a single centered column. Single committed night look. */
+:root {
+  --bg: #0d0a1a;
+  --panel: #1a1233;
+  --gold: #f2c45a;
+  --gold-deep: #c8912b;
+  --parchment: #f4e6c3;
+  --ink: #2a1a0c;
+  --text: #f3eefc;
+  --muted: #b9add6;
+  --danger: #ff8a8a;
+  --font-title: 'Philosopher', Georgia, 'Times New Roman', serif;
+  --font-comic: 'Neucha', 'Comic Sans MS', 'Segoe Print', cursive;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at top, #2b1d55 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--text);
+  font-family: var(--font-title);
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+button { font: inherit; cursor: pointer; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+textarea {
+  width: 100%; resize: none;
+  font: 17px/1.4 var(--font-title);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(242, 196, 90, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+textarea:focus { border-color: var(--gold); }
+textarea::placeholder { color: var(--muted); opacity: 0.8; }
+
+.btn { border: 0; border-radius: 999px; padding: 14px 22px; font-size: 17px; font-weight: 700; width: 100%; transition: transform 0.1s, filter 0.2s; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { filter: grayscale(0.7) brightness(0.7); cursor: default; }
+.btn-gold { background: linear-gradient(180deg, var(--gold), var(--gold-deep)); color: #2a1700; box-shadow: 0 6px 24px rgba(242, 196, 90, 0.3); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid rgba(185, 173, 214, 0.35); }
+.link-btn { background: none; border: 0; color: var(--muted); padding: 4px 0; font-size: 15px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid rgba(242, 196, 90, 0.4); background: rgba(242, 196, 90, 0.08); color: var(--parchment); border-radius: 999px; padding: 8px 12px; font-size: 14px; text-align: left; }
+.chip:active { background: rgba(242, 196, 90, 0.25); }
+
+/* Home */
+.screen { position: fixed; inset: 0; }
+#home { overflow-y: auto; display: flex; justify-content: center; }
+.home-inner {
+  width: 100%; max-width: 460px;
+  display: flex; flex-direction: column; gap: 22px;
+  padding-block: calc(env(safe-area-inset-top, 0px) + 36px) calc(env(safe-area-inset-bottom, 0px) + 36px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.brand { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.crest { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle, #3a2a6e, #140e2a); border: 2px solid var(--gold); box-shadow: 0 0 40px rgba(242, 196, 90, 0.35); }
+.crest svg { width: 34px; height: 34px; }
+h1 { margin: 0; font-size: 34px; color: var(--gold); text-wrap: balance; text-shadow: 0 2px 20px rgba(242, 196, 90, 0.35); }
+.tagline { margin: 0; color: var(--muted); line-height: 1.45; max-width: 34ch; }
+.stack { display: grid; gap: 10px; }
+.start-form { display: grid; gap: 12px; }
+.start-form label { font-size: 19px; font-weight: 700; }
+.form-note { margin: 0; color: var(--muted); font-size: 13px; }
+.notice { margin: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 138, 138, 0.5); background: rgba(255, 138, 138, 0.08); color: #ffd9d9; font-size: 14px; line-height: 1.4; }
+.foot { margin: 0; color: var(--muted); font-size: 12px; text-align: center; line-height: 1.5; }
+
+/* Viewer */
+#viewer { display: grid; place-items: center; background: #000; }
+.stage {
+  position: relative;
+  width: min(100vw, calc(100dvh * 9 / 16));
+  height: min(100dvh, calc(100vw * 16 / 9));
+  overflow: hidden; background: var(--panel);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+@media (min-width: 600px) { .stage { border-radius: 18px; height: min(96dvh, calc(100vw * 16 / 9)); width: min(100vw, calc(96dvh * 9 / 16)); } }
+.bars { position: absolute; z-index: 5; top: 0; left: 0; right: 0; display: flex; gap: 4px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px 0; }
+.bar { flex: 1; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.3); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: #fff; }
+.topbar { position: absolute; z-index: 6; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 20px); display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px; }
+.chapter-label { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+.icon-btn { width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #fff; font-size: 16px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+
+.slide { position: absolute; inset: 0; }
+.art { position: absolute; inset: 0; background: var(--panel); }
+.art img { width: 100%; height: 100%; object-fit: cover; display: block; animation: kenburns 18s ease-out forwards; }
+.art img.fresh { animation: fadeIn 0.6s ease, kenburns 18s ease-out forwards; }
+@keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.07); } }
+.art-status {
+  position: absolute; z-index: 3; left: 50%; top: 52%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 12px 18px; border-radius: 14px;
+  background: rgba(13, 10, 26, 0.7); color: var(--parchment);
+  font-size: 15px; text-align: center; max-width: 80%;
+}
+.art-status .quill { font-size: 26px; animation: bob 1.4s ease-in-out infinite; }
+.shade-top, .shade-bottom { position: absolute; left: 0; right: 0; pointer-events: none; }
+.shade-top { top: 0; height: 30%; background: linear-gradient(rgba(0, 0, 0, 0.55), transparent); }
+.shade-bottom { bottom: 0; height: 45%; background: linear-gradient(transparent, rgba(0, 0, 0, 0.6)); }
+
+.caption {
+  position: absolute; z-index: 2;
+  top: calc(env(safe-area-inset-top, 0px) + 64px); left: 14px; right: 26px;
+  background: var(--parchment); color: var(--ink);
+  font: 18px/1.3 var(--font-comic);
+  padding: 10px 14px; border: 2.5px solid var(--ink); border-radius: 4px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55); transform: rotate(-0.8deg);
+}
+.sfx { position: absolute; z-index: 2; right: 18px; top: 40%; font: 700 42px/1 var(--font-title); color: #ffd84a; -webkit-text-stroke: 2px #3b1300; text-shadow: 4px 4px 0 #3b1300; transform: rotate(-10deg); }
+.bubbles { position: absolute; z-index: 2; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); display: flex; flex-direction: column; gap: 14px; }
+.bubble { position: relative; max-width: 84%; background: #fff; color: #111; font: 18px/1.28 var(--font-comic); padding: 9px 14px 10px; border: 2.5px solid #111; border-radius: 20px; box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45); }
+.bubble b { display: block; font: 700 12px/1.2 var(--font-title); text-transform: uppercase; letter-spacing: 0.06em; color: #6b3fa0; margin-bottom: 2px; }
+.bubble.left { align-self: flex-start; }
+.bubble.right { align-self: flex-end; }
+.bubble::after { content: ''; position: absolute; top: -14px; border: 7px solid transparent; border-bottom: 9px solid #111; }
+.bubble.left::after { left: 22px; }
+.bubble.right::after { right: 22px; }
+.pop { animation: pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) backwards; }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(0.92); } }
+.sfx.pop { animation-name: popSfx; }
+@keyframes popSfx { from { opacity: 0; transform: rotate(-10deg) scale(0.3); } }
+.retry-btn { border: 1px solid var(--gold); background: rgba(242, 196, 90, 0.12); color: var(--gold); border-radius: 999px; padding: 8px 16px; }
+.paused-badge { position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; opacity: 0.8; pointer-events: none; text-shadow: 0 2px 10px #000; }
+
+/* Ask overlay */
+.ask { position: absolute; inset: 0; z-index: 10; display: flex; align-items: flex-end; background: rgba(8, 5, 20, 0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: fadeIn 0.3s ease; }
+.ask-card { width: 100%; max-height: 100%; overflow-y: auto; display: grid; gap: 12px; padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 20px); background: linear-gradient(180deg, rgba(36, 24, 74, 0.97), rgba(16, 10, 34, 0.99)); border-top: 1px solid rgba(242, 196, 90, 0.4); border-radius: 22px 22px 0 0; animation: slideUp 0.35s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.ask-head { display: flex; justify-content: space-between; align-items: center; }
+.ask-chapter { color: var(--muted); font-size: 13px; }
+.ask h2 { margin: 0; font-size: 28px; color: var(--gold); }
+.ask-sub { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+#askForm { display: grid; gap: 12px; }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes slideUp { from { transform: translateY(100%); } }
+
+/* Loading */
+.loading { position: fixed; inset: 0; z-index: 50; display: grid; place-content: center; justify-items: center; gap: 6px; background: rgba(8, 5, 20, 0.9); text-align: center; padding: 20px; }
+.loading p { margin: 0; font-size: 19px; }
+.loading .loading-sub { color: var(--muted); font-size: 14px; max-width: 30ch; line-height: 1.4; }
+.wand { position: relative; width: 120px; height: 120px; margin-bottom: 14px; }
+.owl { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; animation: bob 1.4s ease-in-out infinite; }
+.spark { position: absolute; color: var(--gold); font-size: 20px; animation: twinkle 1.6s ease-in-out infinite; }
+.s1 { top: 0; left: 10px; } .s2 { top: 16px; right: 0; animation-delay: 0.4s; } .s3 { bottom: 6px; right: 14px; animation-delay: 0.8s; } .s4 { bottom: 20px; left: 0; animation-delay: 1.2s; }
+@keyframes bob { 50% { transform: translateY(-8px) rotate(-4deg); } }
+@keyframes twinkle { 0%, 100% { opacity: 0.2; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.2); } }
+
+.toast { position: fixed; z-index: 60; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); transform: translateX(-50%); width: min(calc(100vw - 32px), 420px); background: #2a1430; color: #ffd9d9; border: 1px solid var(--danger); border-radius: 12px; padding: 12px 16px; font-size: 15px; line-height: 1.4; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
+</style>
+
+<main id="home" class="screen">
+  <div class="home-inner">
+    <div class="brand">
+      <div class="crest" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#f2c45a"/></svg></div>
+      <h1>Хроніки Гоґвортсу</h1>
+      <p class="tagline">Комікс у форматі сторіс, сюжет якого пишеш ти. Кожні 5 слайдів ти вирішуєш, що буде далі.</p>
+    </div>
+
+    <p id="unavailable" class="notice" hidden></p>
+
+    <div id="resumeBox" class="stack" hidden>
+      <button id="resumeBtn" class="btn btn-gold" type="button"></button>
+      <button id="newStoryBtn" class="btn btn-ghost" type="button">Почати нову історію</button>
+    </div>
+
+    <form id="startForm" class="start-form">
+      <label for="startPrompt">З чого почнеться історія?</label>
+      <textarea id="startPrompt" rows="3" maxlength="1000" placeholder="Наприклад: Гаррі знаходить таємну кімнату під Великою залою…"></textarea>
+      <div class="chips" id="startChips"></div>
+      <p id="replaceNote" class="form-note" hidden>Поточна історія буде замінена новою.</p>
+      <button type="submit" class="btn btn-gold">✨ Почати історію</button>
+    </form>
+
+    <button id="exampleBtn" class="btn btn-ghost" type="button">Подивитися приклад розділу</button>
+
+    <p class="foot">Сюжет і малюнки створює Claude з твого акаунта. Перший запит попросить дозволу. Фан-проєкт для особистого використання.</p>
+  </div>
+</main>
+
+<section id="viewer" class="screen" aria-label="Комікс" hidden>
+  <div id="stage" class="stage">
+    <div class="bars" id="bars"></div>
+    <div class="topbar">
+      <div class="chapter-label" id="chapterLabel"></div>
+      <button class="icon-btn" id="pauseBtn" type="button" aria-label="Пауза">❚❚</button>
+      <button class="icon-btn" id="closeBtn" type="button" aria-label="На головну">✕</button>
+    </div>
+    <div class="slide" id="slide"></div>
+    <div id="ask" class="ask" hidden>
+      <div class="ask-card">
+        <div class="ask-head">
+          <button class="link-btn" id="askBackBtn" type="button">‹ Назад</button>
+          <span class="ask-chapter" id="askChapter"></span>
+        </div>
+        <h2>Що буде далі?</h2>
+        <p class="ask-sub">Напиши будь-що, і наступні 5 слайдів будуть саме про це.</p>
+        <form id="askForm">
+          <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Твоє продовження…"></textarea>
+          <div class="chips" id="askChips"></div>
+          <button type="submit" class="btn btn-gold">✨ Чаклувати далі</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="loading" class="loading" role="status" aria-live="polite" hidden>
+  <div class="wand"><span class="spark s1">✦</span><span class="spark s2">✧</span><span class="spark s3">✦</span><span class="spark s4">✧</span><span class="owl">🦉</span></div>
+  <p id="loadingText">Сова несе новий сувій…</p>
+  <p class="loading-sub">Claude пише наступні 5 слайдів. Це триває до хвилини.</p>
+</div>
+
+<div id="toast" class="toast" role="alert" hidden></div>
+
+<script>
+(() => {
+'use strict';
+
+const STORAGE_KEY = 'hogwarts-chronicles:v1';
+const HOLD_MS = 220;
+const SLIDES = 5;
+const MOODS = ['night', 'warm', 'danger', 'magic', 'day'];
+
+const EXAMPLES = [
+  'Гаррі знаходить таємну кімнату під Великою залою',
+  'Рон випадково перетворює Снейпа на тхора',
+  "Посеред квідичного матчу з'являється дракон",
+  'Герміона варить зілля, яке показує чужі сни',
+];
+const LOADING_LINES = ['Сова несе новий сувій…', 'Перо саме пише історію…', 'Варимо зілля сюжету…', 'Сортувальний капелюх думає…', 'Гортаємо Заборонену секцію…'];
+
+const EXAMPLE_STORY = {
+  example: true,
+  title: 'Таємниця сріблястого сувою',
+  characters: [],
+  chapters: [{
+    prompt: 'Приклад',
+    title: 'Нічний лист',
+    options: ['Піти за картою просто зараз', 'Розповісти все Дамблдору', 'Сховати сувій і чекати ранку'],
+    slides: [
+      { narration: 'Над Гоґвортсом спускається ніч, але у вітальні Ґрифіндору ще горить камін.', sfx: 'ШУРХ…', mood: 'warm', dialogues: [{ speaker: 'Гаррі', text: 'Ви теж це чули?' }] },
+      { narration: "У вікно влітає сова з дивним сувоєм, перев'язаним срібною стрічкою.", sfx: 'ТУК-ТУК!', mood: 'night', dialogues: [{ speaker: 'Рон', text: 'Скажи, що це просто Півз…' }, { speaker: 'Герміона', text: 'Півз не стукає, Роне.' }] },
+      { narration: 'Сувій розгортається сам і світиться так, що аж очі мружаться.', sfx: 'ВЖУХ!', mood: 'magic', dialogues: [{ speaker: 'Герміона', text: 'Я читала про такі! Вони показують лише те, що хоче сам замок.' }] },
+      { narration: 'Срібні лінії складаються в карту коридору, якого ніхто з них раніше не бачив.', sfx: '', mood: 'magic', dialogues: [{ speaker: 'Гаррі', text: 'Тоді замок хоче, щоб ми туди пішли.' }, { speaker: 'Рон', text: 'Чудово. Просто чудово.' }] },
+      { narration: 'Десь у підземеллях лунає гуркіт. Хтось уже йде слідом…', sfx: 'БАХ!', mood: 'danger', dialogues: [] },
+    ],
+  }],
+};
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  home: $('home'), viewer: $('viewer'), stage: $('stage'), slide: $('slide'), bars: $('bars'),
+  chapterLabel: $('chapterLabel'), pauseBtn: $('pauseBtn'), closeBtn: $('closeBtn'),
+  ask: $('ask'), askForm: $('askForm'), askPrompt: $('askPrompt'), askChips: $('askChips'), askChapter: $('askChapter'), askBackBtn: $('askBackBtn'),
+  startForm: $('startForm'), startPrompt: $('startPrompt'), startChips: $('startChips'), replaceNote: $('replaceNote'),
+  resumeBox: $('resumeBox'), resumeBtn: $('resumeBtn'), newStoryBtn: $('newStoryBtn'), exampleBtn: $('exampleBtn'),
+  loading: $('loading'), loadingText: $('loadingText'), toast: $('toast'), unavailable: $('unavailable'),
+};
+
+// ---------- Claude ----------
+const samplePromise = window.claude && typeof window.claude.use === 'function'
+  ? window.claude.use('sample').catch(() => null)
+  : Promise.resolve(null);
+let sampleOff = false;
+
+function markUnavailable(text) {
+  sampleOff = true;
+  els.unavailable.textContent = text;
+  els.unavailable.hidden = false;
+}
+samplePromise.then((s) => {
+  if (!s) markUnavailable('Тут Claude недоступний, тому нові розділи не згенеруються. Відкрий цю сторінку на claude.ai, увійшовши у свій акаунт. Приклад розділу можна подивитися й так.');
+});
+
+function errorCopy(e) {
+  switch (e && e.code) {
+    case 'not_granted': return 'Сторінці не дозволено звертатися до Claude. Дозвіл можна змінити в меню Permissions цієї сторінки.';
+    case 'sampling_disabled': return 'Claude недоступний для цього акаунта.';
+    case 'rate_limited': return 'Забагато запитів до Claude. Спробуй трохи пізніше.';
+    case 'session_expired': return 'Сесія завершилась. Увійди в claude.ai знову.';
+    case 'refused': return 'Claude не став писати таке продовження. Сформулюй інакше.';
+    case 'invalid_json':
+    case 'empty_completion': return 'Сувій зіпсувався по дорозі. Спробуй ще раз.';
+    default: return 'Не вдалося зв’язатися з Claude. Спробуй ще раз.';
+  }
+}
+
+// ---------- State ----------
+let story = load();
+let pos = { c: 0, s: 0 };
+let elapsed = 0, lastTick = 0;
+let userPaused = false, holding = false, busy = false;
+
+function load() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function save() {
+  if (story && story.example) return;
+  try {
+    if (story) localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign({}, story, { pos })));
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch { /* storage blocked or full: keep going for this session */ }
+}
+const currentChapter = () => story && story.chapters[pos.c];
+const currentSlide = () => currentChapter() && currentChapter().slides[pos.s];
+const isLastSlideOfStory = () => pos.c === story.chapters.length - 1 && pos.s === currentChapter().slides.length - 1;
+
+// ---------- Helpers ----------
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+let toastTimer;
+function toast(msg) {
+  els.toast.textContent = msg;
+  els.toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { els.toast.hidden = true; }, 6000);
+}
+function renderChips(box, items, textarea) {
+  box.replaceChildren(...items.map((t) => {
+    const chip = el('button', 'chip', t);
+    chip.type = 'button';
+    chip.addEventListener('click', () => { textarea.value = t; textarea.focus(); });
+    return chip;
+  }));
+}
+const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+// Mood backdrop drawn in code: shown while Claude draws, and as the panel if drawing fails.
+const PALETTES = { night: ['#0b1d3a', '#2d5d9f', '#cfe8ff'], warm: ['#2a0f12', '#8c4a2f', '#ffcf70'], danger: ['#1a0a0e', '#7a1f2b', '#ff6b4a'], magic: ['#1b1036', '#5b2a86', '#f6c453'], day: ['#16324f', '#5f9ccf', '#fff2b3'] };
+function backdropUrl(mood, seed) {
+  const [a, b, c] = PALETTES[mood] || PALETTES.night;
+  let stars = '';
+  for (let i = 0; i < 36; i++) {
+    const x = (i * 97 + seed * 31) % 600, y = (i * 53 + seed * 17) % 560;
+    stars += `<circle cx="${x}" cy="${y}" r="${(i % 3) + 1}" fill="${c}" opacity="${(0.3 + (i % 5) / 8).toFixed(2)}"/>`;
+  }
+  const moonX = 120 + (seed * 137) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1000"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="600" height="1000" fill="url(#g)"/>${stars}<circle cx="${moonX}" cy="200" r="70" fill="${c}" opacity="0.85"/><path d="M0 780 L70 650 L105 690 L150 530 L195 585 L245 415 L295 560 L330 495 L375 640 L420 585 L480 700 L600 650 L600 1000 L0 1000Z" fill="#000" opacity="0.5"/><path d="M220 1000 V455 L245 400 L270 455 V1000Z M330 1000 V505 L355 450 L380 505 V1000Z" fill="#000" opacity="0.7"/><rect x="236" y="495" width="18" height="28" rx="9" fill="${c}"/><rect x="346" y="545" width="18" height="28" rx="9" fill="${c}"/></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+function svgUrl(svg) { return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); }
+function loads(url) {
+  return new Promise((resolve) => { const i = new Image(); i.onload = () => resolve(true); i.onerror = () => resolve(false); i.src = url; });
+}
+
+// ---------- Prompts ----------
+const WRITER_RULES = `Ти — сценарист інтерактивного коміксу-фанфіку у світі Гаррі Поттера, який читають у форматі сторіс на телефоні. Після кожних ${SLIDES} слайдів читач пише, що має статися далі, а ти пишеш наступний розділ рівно з ${SLIDES} слайдів.
+
+Правила:
+- Мова українська. Імена й назви бери з українського перекладу видавництва «А-БА-БА-ГА-ЛА-МА-ГА»: Гаррі Поттер, Герміона Ґрейнджер, Рон Візлі, Албус Дамблдор, Северус Снейп, Драко Мелфой, Геґрід, Гоґвортс, Ґрифіндор, Слизерин, квідич, маґли.
+- Розвивай саме те, що попросив читач, навіть несподіваний поворот. Зберігай характери героїв і зв'язність із попередніми розділами.
+- Кожен слайд — один кадр з чіткою дією. Останній слайд закінчується інтригою, щоб хотілося вирішити, що далі.
+- narration до 180 символів; dialogues — 0–2 репліки до 110 символів; sfx — звукове слово («БАХ!», «ШУРХ…») або порожній рядок.
+- mood — одне з: night, warm, danger, magic, day.
+- scene — англійською, 1–2 речення: що видно в кадрі, ракурс, місце, світло. Без імен персонажів і назв франшизи, лише опис зовнішності.
+- characters_in_frame — імена (як у characters) тих, хто видно в кадрі.
+- characters — актуальний список усіх персонажів, що вже з'являлися: name українською, visual англійською (вік, статура, волосся, одяг, кольори). Описи з попередніх розділів не змінюй.
+- next_options — 3 короткі (до 60 символів) різні ідеї, що могло б статися далі.
+- Якщо запит недоречний чи жорстокий, м'яко поверни історію в безпечне, але цікаве русло.
+
+Відповідай ЛИШЕ одним JSON-об'єктом:
+{"story_title": "...", "chapter_title": "...", "characters": [{"name": "...", "visual": "..."}], "slides": [{"narration": "...", "dialogues": [{"speaker": "...", "text": "..."}], "sfx": "", "mood": "night", "scene": "...", "characters_in_frame": ["..."]}], "next_options": ["...", "...", "..."]}`;
+
+function chapterPrompt(prompt, story) {
+  const parts = [WRITER_RULES, ''];
+  if (!story || !story.chapters.length) {
+    parts.push('Це початок нової історії.');
+  } else {
+    parts.push(`Назва історії: «${story.title}».`);
+    if (story.characters && story.characters.length) {
+      parts.push('Персонажі (зберігай описи):\n' + story.characters.map((c) => `- ${c.name}: ${c.visual}`).join('\n'));
+    }
+    parts.push('Історія досі:');
+    // Keep the prompt bounded: older chapters as narration only.
+    story.chapters.forEach((ch, i) => {
+      const recent = i >= story.chapters.length - 3;
+      const lines = [`## Розділ ${i + 1}: ${ch.title} (побажання читача: «${ch.prompt}»)`];
+      ch.slides.forEach((s, j) => {
+        lines.push(`${j + 1}. ${s.narration}`);
+        if (recent) (s.dialogues || []).forEach((d) => lines.push(`   ${d.speaker}: ${d.text}`));
+      });
+      parts.push(lines.join('\n'));
+    });
+  }
+  parts.push(`\nЧитач хоче, щоб далі сталося ось що: «${prompt}»\n\nНапиши розділ ${(story ? story.chapters.length : 0) + 1} — рівно ${SLIDES} слайдів.`);
+  return parts.join('\n\n');
+}
+
+function artPrompt(slide) {
+  const inFrame = new Set((slide.characters_in_frame || []).map((n) => n.trim().toLowerCase()));
+  const cast = (story.characters || []).filter((c) => inFrame.has(c.name.trim().toLowerCase()));
+  return `Draw one vertical comic book panel as a single SVG image.
+
+Scene: ${slide.scene || 'a moonlit gothic castle tower'}
+Mood: ${slide.mood || 'night'}
+${cast.length ? 'Characters in the panel (keep their look):\n' + cast.map((c) => '- ' + c.visual).join('\n') : 'No characters required; focus on the setting.'}
+
+Requirements:
+- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1000">.
+- Comic style: bold dark outlines (stroke-width 3-5), flat cel-shaded colors with a few shadow shapes, a full background (sky or walls, floor), midground props, and characters as simple stylized figures with readable poses and expressive faces.
+- Keep the top 22% and bottom 30% of the frame calm and darker (captions and speech bubbles go there); put the action in the middle.
+- No <text>, no letters or numbers, no <image>, no external links, no scripts, no filters or masks.
+- Keep it under 10 KB.
+Reply with only the SVG code.`;
+}
+
+// ---------- Screens ----------
+function showHome() {
+  els.viewer.hidden = true;
+  els.ask.hidden = true;
+  els.home.hidden = false;
+  const saved = story && !story.example ? story : load();
+  if (saved && saved.chapters && saved.chapters.length) {
+    els.resumeBtn.textContent = `▶ Продовжити «${saved.title}»`;
+    els.resumeBox.hidden = false;
+    els.replaceNote.hidden = false;
+  } else {
+    els.resumeBox.hidden = true;
+    els.replaceNote.hidden = true;
+  }
+}
+function showViewer() {
+  els.home.hidden = true;
+  els.viewer.hidden = false;
+  renderSlide();
+}
+
+let loadingTimer;
+function setLoading(on) {
+  busy = on;
+  clearInterval(loadingTimer);
+  els.loading.hidden = !on;
+  if (!on) return;
+  let i = 0;
+  els.loadingText.textContent = LOADING_LINES[0];
+  loadingTimer = setInterval(() => { i = (i + 1) % LOADING_LINES.length; els.loadingText.textContent = LOADING_LINES[i]; }, 2600);
+}
+
+// ---------- Generation ----------
+async function generateChapter(prompt, fresh) {
+  if (busy) return false;
+  const sample = await samplePromise;
+  if (!sample || sampleOff) { toast('Тут Claude недоступний. Відкрий сторінку на claude.ai, увійшовши в акаунт.'); return false; }
+
+  const base = fresh || !story || story.example ? null : story;
+  setLoading(true);
+  try {
+    const data = await sample.json(chapterPrompt(prompt, base), { modelTier: 'default', cache: false });
+    const slides = (Array.isArray(data && data.slides) ? data.slides : []).slice(0, SLIDES).map((s, i) => ({
+      narration: str(s.narration, 300),
+      dialogues: (Array.isArray(s.dialogues) ? s.dialogues : []).slice(0, 3).map((d) => ({ speaker: str(d && d.speaker, 40), text: str(d && d.text, 200) })).filter((d) => d.text),
+      sfx: str(s.sfx, 20),
+      mood: MOODS.includes(s.mood) ? s.mood : MOODS[i % MOODS.length],
+      scene: str(s.scene, 600),
+      characters_in_frame: Array.isArray(s.characters_in_frame) ? s.characters_in_frame.map((n) => str(n, 40)).filter(Boolean) : [],
+      art: { status: 'loading' },
+    })).filter((s) => s.narration);
+    if (!slides.length) throw { code: 'invalid_json' };
+
+    story = base || { title: '', characters: [], chapters: [] };
+    story.title = str(data.story_title, 80) || story.title || 'Без назви';
+    const chars = Array.isArray(data.characters) ? data.characters.map((c) => ({ name: str(c && c.name, 40), visual: str(c && c.visual, 400) })).filter((c) => c.name && c.visual) : [];
+    if (chars.length) story.characters = chars;
+    story.chapters.push({
+      prompt,
+      title: str(data.chapter_title, 80) || `Розділ ${story.chapters.length + 1}`,
+      options: (Array.isArray(data.next_options) ? data.next_options : []).map((o) => str(o, 80)).filter(Boolean).slice(0, 3),
+      slides,
+    });
+    pos = { c: story.chapters.length - 1, s: 0 };
+    elapsed = 0;
+    save();
+    els.ask.hidden = true;
+    showViewer();
+    drawChapter(pos.c);
+    return true;
+  } catch (e) {
+    if (e && (e.code === 'not_granted' || e.code === 'sampling_disabled')) markUnavailable(errorCopy(e));
+    toast(errorCopy(e));
+    return false;
+  } finally {
+    setLoading(false);
+  }
+}
+
+// Panels are drawn in slide order so the one being read arrives first.
+async function drawChapter(c) {
+  const ch = story.chapters[c];
+  for (let i = 0; i < ch.slides.length; i++) {
+    if (!story || story.chapters[c] !== ch) return; // story replaced meanwhile
+    if (ch.slides[i].art && ch.slides[i].art.status === 'done') continue;
+    await drawArt(c, i);
+  }
+}
+const inFlight = new Set();
+async function drawArt(c, s) {
+  const key = c + ':' + s;
+  if (inFlight.has(key)) return;
+  const sample = await samplePromise;
+  const ch = story && story.chapters[c];
+  if (!ch) return;
+  const slide = ch.slides[s];
+  if (!sample || sampleOff) { slide.art = { status: 'error' }; refreshIfCurrent(c, s); return; }
+  inFlight.add(key);
+  slide.art = { status: 'loading' };
+  refreshIfCurrent(c, s);
+  try {
+    const { text } = await sample(artPrompt(slide), { modelTier: 'default' });
+    const m = text.match(/<svg[\s\S]*<\/svg>/i);
+    if (!m) throw { code: 'empty_completion' };
+    let svg = m[0].replace(/<script[\s\S]*?<\/script>/gi, '');
+    if (!/xmlns=/.test(svg.slice(0, 200))) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+    if (!(await loads(svgUrl(svg)))) throw { code: 'invalid_svg' };
+    slide.art = { status: 'done', svg };
+  } catch (e) {
+    slide.art = { status: 'error' };
+    if (e && (e.code === 'not_granted' || e.code === 'sampling_disabled')) markUnavailable(errorCopy(e));
+  } finally {
+    inFlight.delete(key);
+    save();
+    refreshIfCurrent(c, s, true);
+  }
+}
+function refreshIfCurrent(c, s, fresh) {
+  if (pos.c === c && pos.s === s && !els.viewer.hidden) renderArt(fresh);
+}
+
+// ---------- Rendering ----------
+function slideDuration(slide) {
+  const chars = slide.narration.length + (slide.dialogues || []).reduce((n, d) => n + d.text.length, 0);
+  return Math.min(16000, Math.max(7000, 4500 + chars * 45));
+}
+function artReady(slide) { return !slide.art || slide.art.status !== 'loading'; }
+
+function renderBars() {
+  const ch = currentChapter();
+  els.bars.replaceChildren(...ch.slides.map((_, i) => {
+    const bar = el('div', 'bar');
+    const fill = el('i');
+    fill.style.width = i < pos.s ? '100%' : '0%';
+    bar.append(fill);
+    return bar;
+  }));
+  els.chapterLabel.textContent = `Розділ ${pos.c + 1} · ${ch.title}${story.example ? ' (приклад)' : ''}`;
+}
+
+function renderArt(fresh) {
+  const art = els.slide.querySelector('.art');
+  if (!art) return;
+  const slide = currentSlide();
+  const status = slide.art ? slide.art.status : 'none';
+  const img = el('img');
+  img.alt = slide.narration;
+  img.draggable = false;
+  img.src = status === 'done' ? svgUrl(slide.art.svg) : backdropUrl(slide.mood, pos.c * SLIDES + pos.s);
+  if (fresh && status === 'done') img.className = 'fresh';
+  const nodes = [img];
+  if (status === 'loading') {
+    const box = el('div', 'art-status');
+    box.append(el('div', 'quill', '🪶'), el('div', null, 'Claude малює кадр…'));
+    nodes.push(box);
+  } else if (status === 'error' && !sampleOff) {
+    const box = el('div', 'art-status');
+    box.append(el('div', null, 'Кадр не намалювався'));
+    const retry = el('button', 'retry-btn', '⟳ Намалювати ще раз');
+    retry.type = 'button';
+    retry.addEventListener('click', (e) => { e.stopPropagation(); drawArt(pos.c, pos.s); });
+    box.append(retry);
+    nodes.push(box);
+  }
+  art.replaceChildren(...nodes);
+}
+
+function renderSlide() {
+  const slide = currentSlide();
+  if (!slide) return;
+  renderBars();
+  elapsed = 0;
+  const frag = document.createDocumentFragment();
+  frag.append(el('div', 'art'), el('div', 'shade-top'), el('div', 'shade-bottom'));
+  if (slide.narration) frag.append(el('div', 'caption pop', slide.narration));
+  if (slide.sfx) { const sfx = el('div', 'sfx pop', slide.sfx); sfx.style.animationDelay = '0.35s'; frag.append(sfx); }
+  const bubbles = el('div', 'bubbles');
+  (slide.dialogues || []).forEach((d, i) => {
+    const b = el('div', 'bubble pop ' + (i % 2 ? 'right' : 'left'));
+    b.style.animationDelay = (0.6 + i * 0.5) + 's';
+    b.append(el('b', null, d.speaker), document.createTextNode(d.text));
+    bubbles.append(b);
+  });
+  frag.append(bubbles);
+  if (userPaused) frag.append(el('div', 'paused-badge', '❚❚'));
+  els.slide.replaceChildren(frag);
+  renderArt();
+  save();
+}
+
+// ---------- Navigation ----------
+function next() {
+  if (!story) return;
+  if (isLastSlideOfStory()) return openAsk();
+  if (pos.s < currentChapter().slides.length - 1) pos.s++;
+  else pos = { c: pos.c + 1, s: 0 };
+  renderSlide();
+}
+function prev() {
+  if (!story) return;
+  if (pos.s > 0) pos.s--;
+  else if (pos.c > 0) pos = { c: pos.c - 1, s: story.chapters[pos.c - 1].slides.length - 1 };
+  renderSlide();
+}
+function openAsk() {
+  els.askChapter.textContent = `Кінець розділу ${pos.c + 1}`;
+  renderChips(els.askChips, currentChapter().options || [], els.askPrompt);
+  els.askPrompt.value = '';
+  els.ask.hidden = false;
+  els.bars.querySelectorAll('.bar > i').forEach((f) => { f.style.width = '100%'; });
+}
+function setUserPaused(on) {
+  userPaused = on;
+  els.pauseBtn.textContent = on ? '▶' : '❚❚';
+  els.pauseBtn.setAttribute('aria-label', on ? 'Відтворити' : 'Пауза');
+  const badge = els.slide.querySelector('.paused-badge');
+  if (on && !badge) els.slide.append(el('div', 'paused-badge', '❚❚'));
+  if (!on && badge) badge.remove();
+}
+
+// ---------- Auto-advance ----------
+function canAdvance() {
+  if (els.viewer.hidden || !els.ask.hidden || busy || userPaused || holding || document.hidden) return false;
+  const s = currentSlide();
+  return !!s && artReady(s);
+}
+function tick(now) {
+  const dt = lastTick ? Math.min(now - lastTick, 100) : 0;
+  lastTick = now;
+  if (canAdvance()) {
+    elapsed += dt;
+    const total = slideDuration(currentSlide());
+    const fill = els.bars.children[pos.s] && els.bars.children[pos.s].firstElementChild;
+    if (fill) fill.style.width = Math.min(100, (elapsed / total) * 100) + '%';
+    if (elapsed >= total) next();
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// ---------- Input ----------
+let downAt = 0, holdTimer;
+els.stage.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('button, .ask, textarea')) return;
+  downAt = performance.now();
+  holdTimer = setTimeout(() => { holding = true; }, HOLD_MS);
+});
+els.stage.addEventListener('pointerup', (e) => {
+  if (!downAt) return;
+  clearTimeout(holdTimer);
+  const wasHold = holding || performance.now() - downAt >= HOLD_MS;
+  downAt = 0; holding = false;
+  if (wasHold) return;
+  const r = els.stage.getBoundingClientRect();
+  if (e.clientX - r.left < r.width * 0.3) prev(); else next();
+});
+els.stage.addEventListener('pointercancel', () => { clearTimeout(holdTimer); downAt = 0; holding = false; });
+els.stage.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('keydown', (e) => {
+  if (els.viewer.hidden || e.target.matches('textarea')) return;
+  if (e.key === 'ArrowRight') next();
+  else if (e.key === 'ArrowLeft') prev();
+  else if (e.key === ' ') { e.preventDefault(); setUserPaused(!userPaused); }
+  else if (e.key === 'Escape') showHome();
+});
+els.pauseBtn.addEventListener('click', () => setUserPaused(!userPaused));
+els.closeBtn.addEventListener('click', () => { save(); showHome(); });
+els.askBackBtn.addEventListener('click', () => { els.ask.hidden = true; elapsed = 0; });
+
+function submitOnEnter(t, f) { t.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } }); }
+submitOnEnter(els.askPrompt, els.askForm);
+submitOnEnter(els.startPrompt, els.startForm);
+
+els.askForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const p = els.askPrompt.value.trim();
+  if (!p) return els.askPrompt.focus();
+  // Continuing the example starts a real story from the example's setup.
+  await generateChapter(p, false);
+});
+els.startForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const p = els.startPrompt.value.trim();
+  if (!p) return els.startPrompt.focus();
+  if (await generateChapter(p, true)) els.startPrompt.value = '';
+});
+els.resumeBtn.addEventListener('click', () => {
+  if (!story || story.example) story = load();
+  if (!story) return showHome();
+  pos = story.pos && story.chapters[story.pos.c] && story.chapters[story.pos.c].slides[story.pos.s] ? story.pos : { c: 0, s: 0 };
+  showViewer();
+  story.chapters.forEach((ch, c) => { if (ch.slides.some((s) => !s.art || s.art.status !== 'done')) drawChapter(c); });
+});
+els.newStoryBtn.addEventListener('click', () => { els.startPrompt.focus(); els.startForm.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+els.exampleBtn.addEventListener('click', () => {
+  story = JSON.parse(JSON.stringify(EXAMPLE_STORY));
+  pos = { c: 0, s: 0 };
+  showViewer();
+});
+
+// ---------- Boot ----------
+renderChips(els.startChips, EXAMPLES, els.startPrompt);
+showHome();
+})();
+</script>

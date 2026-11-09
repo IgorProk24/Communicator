@@ -602,7 +602,8 @@ const newestFirst = (a, b) => b.id.localeCompare(a.id, 'en', { numeric: true });
 function modelChoices(list) {
   const outputs = (m) => m.architecture?.output_modalities || [];
   const grok = list.filter((m) => m.id.startsWith('x-ai/') && !outputs(m).includes('image')).sort(newestFirst);
-  const image = list.filter((m) => outputs(m).includes('image')).sort(newestFirst);
+  const rank = (m) => (/seedream/i.test(m.id) ? 0 : m.id.startsWith('x-ai/') ? 1 : 2);
+  const image = list.filter((m) => outputs(m).includes('image')).sort((a, b) => rank(a) - rank(b) || newestFirst(a, b));
   return { grok, image };
 }
 // Keep a saved ID if it exists; fix the "grok-4" style without the vendor prefix; otherwise pick a sensible default.
@@ -638,7 +639,7 @@ async function fixSavedModels() {
     const fixed = {
       ...k,
       grokModel: resolveModel(k.grokModel, grok, GROK_PREFER),
-      imageModel: resolveModel(k.imageModel, image, IMAGE_PREFER),
+      imageModel: resolveModel(k.imageModelChosen ? k.imageModel : null, image, IMAGE_PREFER),
     };
     fixed.imageFallbackModel = pickImageFallback(image, fixed.imageModel);
     if (fixed.grokModel !== k.grokModel || fixed.imageModel !== k.imageModel || fixed.imageFallbackModel !== k.imageFallbackModel) {
@@ -706,15 +707,23 @@ function setupSettings() {
     }
     select.value = chosen;
   };
+  // The photo model counts as the reader's own choice only once they change the list themselves.
+  let imageTouched = false;
+  f.imageModel.addEventListener('change', () => (imageTouched = true));
   const fillModelPickers = async (k) => {
     const note = $('modelsNote');
     try {
       const { grok, image } = modelChoices(await loadModelList());
       fillSelect(f.grokModel, grok, resolveModel(k.grokModel, grok, GROK_PREFER));
-      fillSelect(f.imageModel, image, resolveModel(k.imageModel, image, IMAGE_PREFER));
+      fillSelect(f.imageModel, image, resolveModel(k.imageModelChosen ? k.imageModel : null, image, IMAGE_PREFER));
+      imageTouched = Boolean(k.imageModelChosen);
       const fallback = pickImageFallback(image, f.imageModel.value);
+      const seedream = image.filter((m) => /seedream/i.test(m.id));
       note.textContent =
         `Список з OpenRouter: ${grok.length} версій Grok, ${image.length} моделей фото. ` +
+        (seedream.length
+          ? `Seedream на OpenRouter є (${seedream.map((m) => m.id).join(', ')}). `
+          : 'Seedream на OpenRouter зараз немає, тому обрано модель від xAI. ') +
         (fallback ? `Якщо обрана модель фото не спрацює, кадр повториться на ${fallback}.` : 'Запасної моделі фото немає.');
     } catch (err) {
       fillSelect(f.grokModel, [], k.grokModel || defaults.grokModel);
@@ -799,6 +808,7 @@ function setupSettings() {
           grokModel: f.grokModel.value.trim(),
           openrouter: f.openrouter.value.trim(),
           imageModel: f.imageModel.value.trim(),
+          imageModelChosen: imageTouched,
         };
         if (!keys.openrouter || (keys.textProvider === 'claude' && !keys.anthropic)) {
           return toast(keys.textProvider === 'claude' ? 'Потрібні ключі Anthropic і OpenRouter.' : 'Потрібен ключ OpenRouter.');

@@ -52,7 +52,7 @@ async function withRetry(fn) {
 }
 
 // ---------- OpenRouter ----------
-async function openrouterImage(prompt, reference, model = OPENROUTER_MODEL) {
+async function openrouterImage(prompt, reference, model = OPENROUTER_MODEL, modalities = ['image', 'text']) {
   const res = await fetch(`${OPENROUTER_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -68,11 +68,15 @@ async function openrouterImage(prompt, reference, model = OPENROUTER_MODEL) {
           content: reference ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: reference } }] : prompt,
         },
       ],
-      modalities: ['image', 'text'],
+      modalities,
       image_config: { aspect_ratio: '9:16' },
     }),
   });
   const data = await res.json().catch(() => ({}));
+  // Image-only models refuse ['image', 'text']: ask again with ['image'].
+  if (res.status === 400 && modalities.includes('text') && /modalit/i.test(data?.error?.message || '')) {
+    return openrouterImage(prompt, reference, model, ['image']);
+  }
   if (!res.ok) {
     const err = new Error(data?.error?.message || `OpenRouter HTTP ${res.status}`);
     err.status = res.status;

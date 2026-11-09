@@ -133,8 +133,9 @@ async function chapter({ story, prompt, prompts }, { onProgress, signal } = {}) 
 // Draws a slide, or (with `portrait`) the heroine's reference portrait. A `reference` portrait is
 // sent along with every slide so the image model keeps her face the same across the story.
 // One OpenRouter image request with one model; returns the picture as a data URL.
-async function drawWith(model, content, openrouter) {
+async function drawWith(model, content, openrouter, modalities = ['image', 'text']) {
   let data;
+  let swapped = false;
   for (let attempt = 1; ; attempt++) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -142,12 +143,18 @@ async function drawWith(model, content, openrouter) {
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content }],
-        modalities: ['image', 'text'],
+        modalities,
         image_config: { aspect_ratio: '9:16' },
       }),
     });
     data = await res.json().catch(() => ({}));
     if (res.ok) break;
+    // Image-only models refuse ['image', 'text'] (and the other way round): try the other shape once.
+    if (res.status === 400 && !swapped && /modalit/i.test(data?.error?.message || '')) {
+      swapped = true;
+      modalities = modalities.includes('text') ? ['image'] : ['image', 'text'];
+      continue;
+    }
     if ((res.status === 429 || res.status >= 500) && attempt < 3) {
       await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
       continue;
@@ -183,12 +190,12 @@ async function image({ slide, characters, heroine, reference, portrait, prompts 
   const fallback = keys.imageFallbackModel && keys.imageFallbackModel !== primary ? keys.imageFallbackModel : null;
   let url;
   try {
-    url = await drawWith(primary, content, openrouter);
+    url = await drawWith(primary, content, openrouter, keys.imageModalities?.[primary]);
   } catch (err) {
     // A bad key or empty balance fails the same way on any model: don't retry those.
     if (!fallback || err.status === 401 || err.status === 402) throw err;
     console.warn(`[images] ${primary} failed, trying ${fallback}:`, err.message);
-    url = await drawWith(fallback, content, openrouter);
+    url = await drawWith(fallback, content, openrouter, keys.imageModalities?.[fallback]);
   }
   const id = await storeImage(await compress(url));
   return { url: `idb:${id}` };

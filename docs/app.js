@@ -588,10 +588,19 @@ function renderModelChip() {
 
 // OpenRouter's public model list: real IDs for the Grok and photo pickers.
 let modelListPromise = null;
+// The default list leaves out models that only make pictures (Seedream, Grok Imagine…), so the
+// image-output list is fetched as well and merged. A filter OpenRouter doesn't know just returns the default list.
 function loadModelList() {
-  modelListPromise ??= fetch('https://openrouter.ai/api/v1/models')
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-    .then((j) => j.data || [])
+  const get = (q) =>
+    fetch(`https://openrouter.ai/api/v1/models${q}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))));
+  modelListPromise ??= Promise.allSettled([get(''), get('?output_modalities=image'), get('?output_modalities=all')])
+    .then((results) => {
+      const ok = results.filter((r) => r.status === 'fulfilled');
+      if (!ok.length) throw results[0].reason;
+      const byId = new Map();
+      for (const r of ok) for (const m of r.value?.data || []) if (!byId.has(m.id)) byId.set(m.id, m);
+      return [...byId.values()];
+    })
     .catch((err) => {
       modelListPromise = null; // try again next time
       throw err;
@@ -616,6 +625,11 @@ function resolveModel(saved, models, prefer) {
     if (hit) return hit.id;
   }
   return models[0]?.id || saved || '';
+}
+const outputsOf = (m) => m?.architecture?.output_modalities || [];
+function modalitiesFor(id, image) {
+  const m = image.find((x) => x.id === id);
+  return m && !outputsOf(m).includes('text') ? ['image'] : ['image', 'text'];
 }
 const GROK_PREFER = [/^x-ai\/grok-4-fast$/, /^x-ai\/grok.*fast/, /^x-ai\/grok-4/, /^x-ai\/grok/];
 // Photos: Seedream first; if OpenRouter has none, Grok's image model; then Gemini.
@@ -642,7 +656,11 @@ async function fixSavedModels() {
       imageModel: resolveModel(k.imageModelChosen ? k.imageModel : null, image, IMAGE_PREFER),
     };
     fixed.imageFallbackModel = pickImageFallback(image, fixed.imageModel);
-    if (fixed.grokModel !== k.grokModel || fixed.imageModel !== k.imageModel || fixed.imageFallbackModel !== k.imageFallbackModel) {
+    fixed.imageModalities = {
+      [fixed.imageModel]: modalitiesFor(fixed.imageModel, image),
+      ...(fixed.imageFallbackModel ? { [fixed.imageFallbackModel]: modalitiesFor(fixed.imageFallbackModel, image) } : {}),
+    };
+    if (JSON.stringify(fixed) !== JSON.stringify(k)) {
       backend.setKeys(fixed);
       renderModelChip();
     }
@@ -656,6 +674,7 @@ async function fixSavedModels() {
 // settings encrypted with the reader's password (PBKDF2-SHA256 → AES-256-GCM). The fragment never
 // leaves the browser: it is not sent to GitHub Pages.
 const LOGIN_PREFIX = '#login=';
+const LOGIN_LINK_KEY = 'stories-for-two:login-link';
 const b64u = {
   to: (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   from: (str) => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
@@ -786,21 +805,27 @@ function setupSettings() {
   };
   // The photo model counts as the reader's own choice only once they change the list themselves.
   let imageTouched = false;
+  let pickerImages = []; // photo models from the last list, to store the right request shape on save
   f.imageModel.addEventListener('change', () => (imageTouched = true));
   const fillModelPickers = async (k) => {
     const note = $('modelsNote');
     try {
       const { grok, image } = modelChoices(await loadModelList());
+      pickerImages = image;
       fillSelect(f.grokModel, grok, resolveModel(k.grokModel, grok, GROK_PREFER));
       fillSelect(f.imageModel, image, resolveModel(k.imageModelChosen ? k.imageModel : null, image, IMAGE_PREFER));
       imageTouched = Boolean(k.imageModelChosen);
       const fallback = pickImageFallback(image, f.imageModel.value);
       const seedream = image.filter((m) => /seedream/i.test(m.id));
+      const xaiImage = image.filter((m) => m.id.startsWith('x-ai/'));
+      const chosen = f.imageModel.value;
       note.textContent =
         `Список з OpenRouter: ${grok.length} версій Grok, ${image.length} моделей фото. ` +
         (seedream.length
-          ? `Seedream на OpenRouter є (${seedream.map((m) => m.id).join(', ')}). `
-          : 'Seedream на OpenRouter зараз немає, тому обрано модель від xAI. ') +
+          ? `Seedream є: ${seedream.map((m) => m.id).join(', ')}. `
+          : xaiImage.length
+            ? `Seedream на OpenRouter немає, тому за замовчуванням обрано модель від xAI (${xaiImage[0].id}). `
+            : `На OpenRouter не знайдено ні Seedream, ні моделі фото від xAI, тому обрано ${chosen}. `) +
         (fallback ? `Якщо обрана модель фото не спрацює, кадр повториться на ${fallback}.` : 'Запасної моделі фото немає.');
     } catch (err) {
       fillSelect(f.grokModel, [], k.grokModel || defaults.grokModel);
@@ -842,18 +867,53 @@ function setupSettings() {
 
   // Login link: encrypt what is saved now with the reader's password.
   if (backend) {
+    const showLink = (link) => {
+      $('loginLink').value = link;
+      $('loginOut').hidden = !link;
+      $('loginShare').hidden = !navigator.share;
+    };
+    // The link is encrypted, so keeping it here is safe; it saves having to create it again.
+    try {
+      showLink(localStorage.getItem(LOGIN_LINK_KEY) || '');
+    } catch {
+      /* storage blocked */
+    }
     $('loginMake').addEventListener('click', async () => {
+      const btn = $('loginMake');
       const p1 = $('loginPass').value;
       const p2 = $('loginPass2').value;
       if (p1.length < 8) return toast('Пароль має бути щонайменше 8 символів.');
       if (p1 !== p2) return toast('Паролі не збігаються.');
       if (!backend.hasKeys()) return toast('Спершу введи ключі й натисни «Зберегти», потім створи посилання.');
-      const token = await sealLogin(p1, { keys: backend.getKeys(), prompts: loadPrompts() });
-      $('loginLink').value = loginLinkFor(token);
-      $('loginOut').hidden = false;
-      $('loginPass').value = '';
-      $('loginPass2').value = '';
-      toast('Посилання створено. Збережи його в закладках або нотатках.', true);
+      if (!window.crypto?.subtle) return toast('Цей браузер не підтримує шифрування. Відкрий сайт у Safari за адресою https://….');
+      btn.disabled = true;
+      btn.textContent = 'Створюю…';
+      try {
+        const token = await sealLogin(p1, { keys: backend.getKeys(), prompts: loadPrompts() });
+        const link = loginLinkFor(token);
+        showLink(link);
+        try {
+          localStorage.setItem(LOGIN_LINK_KEY, link);
+        } catch {
+          /* storage blocked: the link is still shown */
+        }
+        $('loginPass').value = '';
+        $('loginPass2').value = '';
+        $('loginOut').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        toast('Посилання створено. Скопіюй його або натисни «Поділитися» й збережи в Нотатки.', true);
+      } catch (err) {
+        toast(`Не вдалося створити посилання: ${err?.message || err}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Створити посилання для входу';
+      }
+    });
+    $('loginShare').addEventListener('click', async () => {
+      try {
+        await navigator.share({ title: 'Історії на двох — вхід', url: $('loginLink').value });
+      } catch {
+        /* the reader closed the share sheet */
+      }
     });
     $('loginCopy').addEventListener('click', async () => {
       const link = $('loginLink');
@@ -915,6 +975,11 @@ function setupSettings() {
           imageModel: f.imageModel.value.trim(),
           imageModelChosen: imageTouched,
         };
+        if (pickerImages.length) {
+          keys.imageFallbackModel = pickImageFallback(pickerImages, keys.imageModel);
+          keys.imageModalities = { [keys.imageModel]: modalitiesFor(keys.imageModel, pickerImages) };
+          if (keys.imageFallbackModel) keys.imageModalities[keys.imageFallbackModel] = modalitiesFor(keys.imageFallbackModel, pickerImages);
+        }
         if (!keys.openrouter || (keys.textProvider === 'claude' && !keys.anthropic)) {
           return toast(keys.textProvider === 'claude' ? 'Потрібні ключі Anthropic і OpenRouter.' : 'Потрібен ключ OpenRouter.');
         }

@@ -71,6 +71,13 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, {
     if (err instanceof Anthropic.APIConnectionTimeoutError) {
       throw new StoryError('Claude не відповів вчасно. Перевір інтернет і спробуй ще раз.', 504);
     }
+    if (err instanceof Anthropic.APIConnectionError) {
+      const why = err.cause?.message || err.message || 'невідома причина';
+      throw new StoryError(
+        `Зв'язок із Claude обірвався (${why}). Не згортай браузер і не блокуй екран, поки пишеться розділ, і спробуй ще раз.`,
+        503,
+      );
+    }
     if (err instanceof Anthropic.APIError) {
       console.error('[claude] API error', err.status, err.message);
       throw new StoryError(`Помилка Claude (${err.status ?? 'мережа'}${detail}).`, 502);

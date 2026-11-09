@@ -279,6 +279,7 @@ h1 {
 }
 .loading p { margin: 0; font-size: 19px; }
 .loading .loading-time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.loading .loading-hint { color: var(--muted); font-size: 12px; opacity: 0.8; margin-top: 2px; }
 .loading .loading-cancel { width: auto; margin-top: 18px; padding: 10px 22px; font-size: 15px; }
 .loading .loading-sub { color: var(--muted); font-size: 14px; }
 .wand { position: relative; width: 120px; height: 120px; margin-bottom: 14px; }

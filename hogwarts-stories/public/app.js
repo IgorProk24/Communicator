@@ -149,10 +149,12 @@ function setLoading(on) {
   busy = on;
   clearInterval(loadingTimer);
   if (!on) {
+    loadingAbort?.abort(); // also releases the screen wake lock
     loadingAbort = null;
     return hide(els.loading);
   }
   loadingAbort = new AbortController();
+  keepAwake(loadingAbort.signal);
   const started = Date.now();
   let i = 0;
   els.loadingText.textContent = LOADING_LINES[0];
@@ -168,6 +170,19 @@ function setLoading(on) {
     }
   }, 1000);
   return loadingAbort.signal;
+}
+
+// iOS drops network requests of a locked or backgrounded tab, so keep the screen on while waiting.
+async function keepAwake(signal) {
+  try {
+    const lock = await navigator.wakeLock?.request('screen');
+    if (!lock) return;
+    const release = () => lock.release().catch(() => {});
+    if (signal.aborted) return release();
+    signal.addEventListener('abort', release, { once: true });
+  } catch {
+    /* not supported or refused: nothing to do */
+  }
 }
 
 function showProgress({ phase, slides }) {

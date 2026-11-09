@@ -1,0 +1,20 @@
+{
+  "name": "hogwarts-stories",
+  "version": "1.0.0",
+  "description": "Інтерактивний комікс-фанфік про Гаррі Поттера у форматі сторіс: кожні 5 слайдів ти вирішуєш, що буде далі",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "dev": "node --watch --env-file-if-exists=.env server/index.js",
+    "demo": "DEMO_MODE=1 node --env-file-if-exists=.env server/index.js"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "express": "^5.3.0",
+    "openai": "^5.23.2"
+  }
+}

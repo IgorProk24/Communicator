@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0d0a1a" />
+  <title>Хроніки Гоґвортсу — комікс-сторіс</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Neucha&family=Philosopher:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Home -->
+  <main id="home" class="screen">
+    <div class="home-inner">
+      <div class="crest" aria-hidden="true">⚡</div>
+      <h1>Хроніки Гоґвортсу</h1>
+      <p class="tagline">Комікс у форматі сторіс, сюжет якого пишеш ти. Кожні 5 слайдів ти вирішуєш, що буде далі.</p>
+
+      <div id="resumeBox" class="resume hidden">
+        <button id="resumeBtn" class="btn btn-gold"></button>
+        <button id="newStoryBtn" class="btn btn-ghost">Почати нову історію</button>
+      </div>
+
+      <form id="startForm" class="start-form">
+        <label for="startPrompt">З чого почнеться історія?</label>
+        <textarea id="startPrompt" rows="3" maxlength="1000" placeholder="Наприклад: Гаррі знаходить таємну кімнату під Великою залою…"></textarea>
+        <div class="chips" id="startChips"></div>
+        <button type="submit" class="btn btn-gold">✨ Почати історію</button>
+      </form>
+      <p id="demoNote" class="note hidden"></p>
+    </div>
+  </main>
+
+  <!-- Stories viewer -->
+  <section id="viewer" class="screen hidden" aria-label="Комікс">
+    <div id="stage" class="stage">
+      <div class="bars" id="bars"></div>
+      <div class="topbar">
+        <div class="chapter-label" id="chapterLabel"></div>
+        <button class="icon-btn" id="pauseBtn" aria-label="Пауза">❚❚</button>
+        <button class="icon-btn" id="closeBtn" aria-label="На головну">✕</button>
+      </div>
+      <div class="slide" id="slide"></div>
+
+      <!-- "What happens next?" -->
+      <div id="ask" class="ask hidden">
+        <div class="ask-card">
+          <div class="ask-head">
+            <button class="link-btn" id="askBackBtn">‹ Назад</button>
+            <span class="ask-chapter" id="askChapter"></span>
+          </div>
+          <h2>Що буде далі?</h2>
+          <p class="ask-sub">Напиши будь-що, і наступні 5 слайдів намалюються саме про це.</p>
+          <form id="askForm">
+            <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Твоє продовження…"></textarea>
+            <div class="chips" id="askChips"></div>
+            <button type="submit" class="btn btn-gold">✨ Чаклувати далі</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Loading -->
+  <div id="loading" class="loading hidden" role="status" aria-live="polite">
+    <div class="wand">
+      <span class="spark s1">✦</span><span class="spark s2">✧</span><span class="spark s3">✦</span><span class="spark s4">✧</span>
+      <span class="owl">🦉</span>
+    </div>
+    <p id="loadingText">Сова несе новий сувій…</p>
+    <p class="loading-sub">Пишемо наступні 5 слайдів</p>
+  </div>
+
+  <div id="toast" class="toast hidden" role="alert"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

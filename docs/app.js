@@ -29,11 +29,20 @@ let pos = { c: 0, s: 0 };
 let busy = false;
 
 function load() {
+  let data = {};
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
   } catch {
     return {};
   }
+  // A chapter still being written when the page closed keeps the frames it had.
+  for (const st of Object.values(data)) {
+    if (!Array.isArray(st?.chapters)) continue;
+    st.chapters = st.chapters
+      .map((ch) => ({ ...ch, streaming: false, slides: (ch.slides || []).filter(Boolean) }))
+      .filter((ch) => ch.slides.length);
+  }
+  return data;
 }
 function save() {
   if (currentId && lib[currentId]) lib[currentId].pos = pos;
@@ -48,7 +57,8 @@ const preset = (id) => CATALOG.find((s) => s.id === id);
 const state = () => lib[currentId];
 const currentChapter = () => state()?.chapters?.[pos.c];
 const currentSlide = () => currentChapter()?.slides[pos.s];
-const isLastSlideOfStory = () => pos.c === state().chapters.length - 1 && pos.s === currentChapter().slides.length - 1;
+const isLastSlideOfStory = () =>
+  pos.c === state().chapters.length - 1 && !currentChapter().streaming && pos.s === currentChapter().slides.length - 1;
 
 // ---------- Helpers ----------
 function el(tag, cls, text) {
@@ -233,9 +243,11 @@ els.introForm.addEventListener('submit', async (e) => {
 });
 
 // ---------- Loading ----------
+// One "work" spans a whole chapter: the overlay is shown until the first frame is ready, but the
+// request (and the screen wake lock) lives on while the rest of the chapter streams in.
 let loadingTimer;
-let loadingAbort = null;
-els.loadingCancel.addEventListener('click', () => loadingAbort?.abort());
+let workAbort = null;
+els.loadingCancel.addEventListener('click', () => workAbort?.abort());
 
 // iOS drops network requests of a locked or backgrounded tab, so keep the screen on while waiting.
 async function keepAwake(signal) {
@@ -250,34 +262,62 @@ async function keepAwake(signal) {
   }
 }
 
-function setLoading(on) {
-  busy = on;
-  clearInterval(loadingTimer);
-  if (!on) {
-    loadingAbort?.abort(); // also releases the wake lock
-    loadingAbort = null;
-    return hide(els.loading);
-  }
-  loadingAbort = new AbortController();
-  keepAwake(loadingAbort.signal);
+function startWork() {
+  busy = true;
+  workAbort = new AbortController();
+  keepAwake(workAbort.signal);
   const started = Date.now();
   let i = 0;
   els.loadingText.textContent = LOADING_LINES[0];
   els.loadingProgress.textContent = 'Надсилаємо запит…';
   els.loadingTime.textContent = '0:00';
   show(els.loading);
+  clearInterval(loadingTimer);
   loadingTimer = setInterval(() => {
     const sec = Math.floor((Date.now() - started) / 1000);
     els.loadingTime.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
     if (sec % 4 === 0) els.loadingText.textContent = LOADING_LINES[++i % LOADING_LINES.length];
   }, 1000);
-  return loadingAbort.signal;
+  return workAbort.signal;
+}
+function hideOverlay() {
+  clearInterval(loadingTimer);
+  hide(els.loading);
+}
+function endWork() {
+  hideOverlay();
+  busy = false;
+  workAbort?.abort(); // also releases the wake lock
+  workAbort = null;
 }
 
 function showProgress({ phase, slides }) {
+  if (els.loading.classList.contains('hidden')) return;
   const who = textModelName();
   els.loadingProgress.textContent =
     phase === 'thinking' ? `${who} обдумує сюжет…` : `${who} пише: кадр ${Math.max(1, slides)}`;
+}
+
+// How fast the last chapter came, to compare models (shown in Settings).
+const TIMING_KEY = 'stories-for-two:timing';
+function saveTiming(t) {
+  try {
+    localStorage.setItem(TIMING_KEY, JSON.stringify(t));
+  } catch {
+    /* not important */
+  }
+}
+function timingText() {
+  try {
+    const t = JSON.parse(localStorage.getItem(TIMING_KEY));
+    if (!t) return '';
+    const parts = [];
+    if (t.firstFrame) parts.push(`перший кадр (текст + фото) за ${t.firstFrame} с`);
+    if (t.text) parts.push(`увесь текст за ${t.text} с`);
+    return parts.length ? `Останній розділ (${t.model}): ${parts.join(', ')}.` : '';
+  } catch {
+    return '';
+  }
 }
 
 // ---------- Generation ----------
@@ -327,36 +367,97 @@ function ensurePortrait(id) {
   return portraitJobs.get(id);
 }
 
+const str = (v) => (typeof v === 'string' ? v : '');
+function cleanSlide(s) {
+  return {
+    narration: str(s?.narration),
+    dialogues: (Array.isArray(s?.dialogues) ? s.dialogues : []).map((d) => ({ speaker: str(d?.speaker), text: str(d?.text) })).filter((d) => d.text),
+    sfx: str(s?.sfx),
+    image_prompt: str(s?.image_prompt),
+    characters_in_frame: Array.isArray(s?.characters_in_frame) ? s.characters_in_frame.map(str).filter(Boolean) : [],
+  };
+}
+
+// Called when the first frame's photo is settled (made or failed): that is when the chapter opens.
+const firstFrameWaiters = new Map();
+
+// Streams a chapter frame by frame: each finished frame starts its photo right away, and the
+// chapter opens as soon as frame 1 has both its text and its photo. The rest arrive while reading.
 async function generateChapter(id, prompt) {
   if (busy) return false;
-  const signal = setLoading(true);
-  await modelsReady; // saved model IDs are checked first, so the request uses a real one
-  const portrait = ensurePortrait(id); // made while Claude writes
-  try {
-    const data = await api('/api/chapter', { story: storyForApi(id), prompt, prompts: customPrompts() }, { signal, onProgress: showProgress });
-    const st = (lib[id] ||= {});
-    st.chapters ||= [];
-    if (Array.isArray(data.characters) && data.characters.length) st.characters = data.characters;
-    st.chapters.push({
-      prompt,
-      title: data.chapter_title || `Розділ ${st.chapters.length + 1}`,
-      options: data.next_options || [],
-      writtenBy: textModelName(),
-      slides: data.slides.map((s) => ({ ...s, image: { status: 'loading' } })),
-    });
+  const signal = startWork();
+  const t0 = performance.now();
+  await modelsReady; // saved model IDs are checked first, so requests use real ones
+  const portrait = ensurePortrait(id); // made while the text is written
+  const st = (lib[id] ||= {});
+  st.chapters ||= [];
+  const story = storyForApi(id); // before the new chapter is added
+  const c = st.chapters.length;
+  const ch = { prompt, title: `Розділ ${c + 1}`, options: [], writtenBy: textModelName(), slides: [], streaming: true };
+  st.chapters.push(ch);
+  const timing = { model: textModelName() };
+
+  let opened = false;
+  let resolveFirst;
+  const firstFrame = new Promise((r) => (resolveFirst = r));
+  firstFrameWaiters.set(`${id}:${c}`, () => {
+    if (opened) return;
+    opened = true;
+    timing.firstFrame = Math.round((performance.now() - t0) / 1000);
+    saveTiming(timing);
     currentId = id;
-    pos = { c: st.chapters.length - 1, s: 0 };
-    save();
+    pos = { c, s: 0 };
+    hideOverlay();
     hide(els.ask);
     showViewer();
-    const c = pos.c;
-    portrait.then(() => st.chapters[c].slides.forEach((_, i) => drawImage(id, c, i)));
+    resolveFirst();
+  });
+
+  const addSlide = (i, raw) => {
+    if (ch.slides[i]) return;
+    ch.slides[i] = { ...cleanSlide(raw), image: { status: 'loading' } };
+    if (i === 0 && !opened) els.loadingProgress.textContent = 'Перший кадр написано, створюємо фото…';
+    portrait.then(() => drawImage(id, c, i));
+    // The reader may already be waiting on this frame.
+    if (opened && currentId === id && pos.c === c && !els.viewer.classList.contains('hidden')) renderSlide();
+  };
+
+  try {
+    const data = await api(
+      '/api/chapter',
+      { story, prompt, prompts: customPrompts() },
+      { signal, onProgress: showProgress, onSlide: addSlide },
+    );
+    // Backends that don't stream frames (the server build) hand everything over here.
+    (data.slides || []).forEach((s, i) => addSlide(i, s));
+    ch.slides = ch.slides.slice(0, Math.max(1, (data.slides || []).length));
+    if (Array.isArray(data.characters) && data.characters.length) st.characters = data.characters;
+    ch.title = data.chapter_title || ch.title;
+    ch.options = data.next_options || [];
+    ch.streaming = false;
+    timing.text = Math.round((performance.now() - t0) / 1000);
+    saveTiming(timing);
+    save();
+    if (opened && currentId === id && pos.c === c) renderSlide();
+    await firstFrame; // the overlay stays until frame 1 has its photo
     return true;
   } catch (err) {
-    if (!signal.aborted) toast(err.message);
-    return false;
+    ch.streaming = false;
+    ch.slides = ch.slides.filter(Boolean);
+    if (!ch.slides.length) {
+      st.chapters.splice(c, 1); // nothing arrived: drop the empty chapter
+      firstFrameWaiters.delete(`${id}:${c}`);
+    } else if (!opened) {
+      firstFrameWaiters.get(`${id}:${c}`)?.(); // show what was written
+    } else if (currentId === id && pos.c === c) {
+      pos.s = Math.min(pos.s, ch.slides.length - 1);
+      renderSlide();
+    }
+    save();
+    if (!signal.aborted) toast(ch.slides.length ? `Розділ обірвався: ${err.message}` : err.message);
+    return ch.slides.length > 0;
   } finally {
-    setLoading(false);
+    endWork();
   }
 }
 
@@ -367,7 +468,8 @@ async function drawImage(id, c, s) {
   if (inFlight.has(key)) return;
   inFlight.add(key);
   const st = lib[id];
-  const slide = st.chapters[c].slides[s];
+  const slide = st.chapters[c]?.slides[s];
+  if (!slide) return inFlight.delete(key);
   slide.image = { status: 'loading' };
   refreshIfCurrent(id, c, s);
   try {
@@ -387,11 +489,17 @@ async function drawImage(id, c, s) {
   } finally {
     inFlight.delete(key);
     save();
+    if (s === 0) {
+      const open = firstFrameWaiters.get(`${id}:${c}`);
+      firstFrameWaiters.delete(`${id}:${c}`);
+      open?.();
+    }
     refreshIfCurrent(id, c, s);
   }
 }
+// A frame's text appears together with its photo, so the whole frame is redrawn when the photo lands.
 function refreshIfCurrent(id, c, s) {
-  if (currentId === id && pos.c === c && pos.s === s && !els.viewer.classList.contains('hidden')) renderArt();
+  if (currentId === id && pos.c === c && pos.s === s && !els.viewer.classList.contains('hidden')) renderSlide();
 }
 
 // ---------- Viewer ----------
@@ -420,9 +528,12 @@ function fillAvatar() {
 
 function renderBars() {
   const ch = currentChapter();
+  // While the chapter is still being written, one more (dim) bar stands for the frame on its way.
+  const count = ch.slides.length + (ch.streaming ? 1 : 0);
   els.bars.replaceChildren(
-    ...ch.slides.map((_, i) => {
+    ...Array.from({ length: count }, (_, i) => {
       const bar = el('div', 'bar');
+      if (i >= ch.slides.length) bar.classList.add('pending');
       const fill = el('i');
       fill.style.width = i <= pos.s ? '100%' : '0%'; // no timer: bars just show where you are
       bar.append(fill);
@@ -453,10 +564,10 @@ function renderArt() {
       },
       () => {
         slide.image = { status: 'error', message: 'Фото загубилося — створи ще раз.' };
-        renderArt();
+        renderSlide();
       },
     );
-  } else if (img.status === 'error') {
+  } else {
     const box = el('div', 'art-placeholder error');
     box.append(el('div', 'big', '📷'), el('div', null, img.message || 'Не вдалося створити фото'));
     const retry = el('button', 'retry-btn', '⟳ Спробувати ще раз');
@@ -467,17 +578,26 @@ function renderArt() {
     });
     box.append(retry);
     art.replaceChildren(box);
-  } else {
-    const box = el('div', 'art-placeholder');
-    box.append(el('div', 'big', '📸'), el('div', null, 'Створюємо фото…'));
-    art.replaceChildren(box);
   }
 }
 
+// Waiting state of a frame: no text until its photo is there.
+function renderWaiting(message) {
+  const box = el('div', 'art-placeholder');
+  box.append(el('div', 'big', '📸'), el('div', null, message));
+  const art = el('div', 'art');
+  art.append(box);
+  els.slide.replaceChildren(art);
+}
+
 function renderSlide() {
-  const slide = currentSlide();
-  if (!slide) return;
+  const ch = currentChapter();
+  if (!ch) return;
   renderBars();
+  const slide = currentSlide();
+  if (!slide) return renderWaiting('Пишемо наступний кадр…');
+  if (slide.image?.status === 'loading') return renderWaiting('Створюємо фото…');
+
   const frag = document.createDocumentFragment();
   frag.append(el('div', 'art'), el('div', 'shade-top'), el('div', 'shade-bottom'));
   if (slide.narration) frag.append(el('div', 'caption pop', slide.narration));
@@ -503,17 +623,22 @@ function renderSlide() {
   renderArt();
 
   // Warm up the next photo so the tap feels instant.
-  const next = currentChapter().slides[pos.s + 1];
+  const next = ch.slides[pos.s + 1];
   if (next?.image?.status === 'done') displayUrl(next.image.url).then(preload, () => {});
   save();
 }
 
 // ---------- Navigation ----------
 function next() {
-  if (!state()) return;
-  if (isLastSlideOfStory()) return openAsk();
-  if (pos.s < currentChapter().slides.length - 1) pos.s++;
-  else pos = { c: pos.c + 1, s: 0 };
+  const ch = currentChapter();
+  if (!ch) return;
+  const last = ch.slides.length - 1;
+  if (pos.s < last) pos.s++;
+  else if (ch.streaming) {
+    if (pos.s === last) pos.s++; // step onto the frame that is still being written
+    else return;
+  } else if (pos.c < state().chapters.length - 1) pos = { c: pos.c + 1, s: 0 };
+  else return openAsk();
   renderSlide();
 }
 function prev() {
@@ -573,7 +698,9 @@ function textProvider() {
   return backend ? backend.getKeys().textProvider || 'claude' : serverTextProvider;
 }
 function textModelName() {
-  return textProvider() === 'grok' ? 'Grok' : 'Claude';
+  if (textProvider() === 'grok') return 'Grok';
+  const m = backend?.getKeys().claudeModel || '';
+  return m.includes('haiku') ? 'Claude Haiku' : m.includes('sonnet') ? 'Claude Sonnet' : 'Claude';
 }
 const shortModel = (id) => (id || '').split('/').pop();
 
@@ -772,7 +899,7 @@ function setupSettings() {
   const status = $('keysStatus');
   const checkBtn = $('keysCheck');
   const f = {
-    anthropic: $('keyAnthropic'), grokModel: $('grokModel'),
+    anthropic: $('keyAnthropic'), claudeModel: $('claudeModel'), grokModel: $('grokModel'),
     openrouter: $('keyOpenrouter'), imageModel: $('keyImageModel'),
     story: $('promptStory'), imageStyle: $('promptImage'),
   };
@@ -846,9 +973,11 @@ function setupSettings() {
       providerInputs.forEach((r) => (r.checked = r.value === (k.textProvider || 'claude')));
       f.anthropic.value = k.anthropic || '';
       f.openrouter.value = k.openrouter || '';
+      f.claudeModel.value = k.claudeModel || 'claude-opus-5-5';
       fillModelPickers(k);
       syncProvider();
     }
+    $('timingLine').textContent = timingText();
     const p = loadPrompts();
     f.story.value = p.story?.trim() ? p.story : defaults.story;
     f.imageStyle.value = p.imageStyle?.trim() ? p.imageStyle : defaults.imageStyle;
@@ -970,6 +1099,7 @@ function setupSettings() {
         const keys = {
           textProvider: provider(),
           anthropic: f.anthropic.value.trim(),
+          claudeModel: f.claudeModel.value,
           grokModel: f.grokModel.value.trim(),
           openrouter: f.openrouter.value.trim(),
           imageModel: f.imageModel.value.trim(),

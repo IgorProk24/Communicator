@@ -2,7 +2,7 @@
 // writeChapterWith() takes any Anthropic client, so the browser-only build reuses it.
 import Anthropic from '@anthropic-ai/sdk';
 import { CHAPTER_SCHEMA, buildSystemPrompt, buildUserMessage } from './prompts.js';
-import { StoryError, parseChapter, slidesSoFar } from './chapter.js';
+import { StoryError, parseChapter, slidesSoFar, slideEmitter } from './chapter.js';
 
 export { StoryError };
 
@@ -27,7 +27,7 @@ export async function writeChapterWith(
   story,
   prompt,
   opts = DEFAULTS,
-  { onProgress, signal, timeout, storyPrompt } = {},
+  { onProgress, onSlide, signal, timeout, storyPrompt } = {},
 ) {
   const { model, effort } = opts;
   const request = {
@@ -50,9 +50,13 @@ export async function writeChapterWith(
   let response;
   try {
     const stream = client.beta.messages.stream(request, { signal, ...(timeout ? { timeout } : {}) });
-    if (onProgress) {
-      onProgress({ phase: 'thinking', slides: 0 });
-      stream.on('text', (_delta, snapshot) => onProgress({ phase: 'writing', slides: slidesSoFar(snapshot) }));
+    const emit = slideEmitter(onSlide);
+    onProgress?.({ phase: 'thinking', slides: 0 });
+    if (onProgress || onSlide) {
+      stream.on('text', (_delta, snapshot) => {
+        onProgress?.({ phase: 'writing', slides: slidesSoFar(snapshot) });
+        emit(snapshot);
+      });
     }
     response = await stream.finalMessage();
   } catch (err) {

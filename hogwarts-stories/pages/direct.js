@@ -105,7 +105,7 @@ const BROWSER_OPTS = { ...DEFAULTS, effort: 'low' };
 const CHAPTER_TIMEOUT_MS = 180_000;
 
 // The text model is chosen in Settings: Claude (default) or Grok.
-async function chapter({ story, prompt, prompts }, { onProgress, signal } = {}) {
+async function chapter({ story, prompt, prompts }, { onProgress, onSlide, signal } = {}) {
   const keys = readKeys();
   const storyPrompt = prompts?.story;
   try {
@@ -118,12 +118,13 @@ async function chapter({ story, prompt, prompts }, { onProgress, signal } = {}) 
         baseUrl: OPENROUTER_URL,
         via: 'OpenRouter',
         model: keys.grokModel || GROK_OPENROUTER_MODEL,
-        story, prompt, storyPrompt, onProgress, signal, timeout: CHAPTER_TIMEOUT_MS,
+        story, prompt, storyPrompt, onProgress, onSlide, signal, timeout: CHAPTER_TIMEOUT_MS,
       });
     }
     if (!keys.anthropic) throw new HttpError('Спершу додай ключ Anthropic у налаштуваннях (⚙️).', 400);
     const client = new Anthropic({ apiKey: keys.anthropic, dangerouslyAllowBrowser: true, maxRetries: 1 });
-    return await writeChapterWith(client, story, prompt, BROWSER_OPTS, { onProgress, signal, timeout: CHAPTER_TIMEOUT_MS, storyPrompt });
+    const opts = { ...BROWSER_OPTS, model: keys.claudeModel || BROWSER_OPTS.model };
+    return await writeChapterWith(client, story, prompt, opts, { onProgress, onSlide, signal, timeout: CHAPTER_TIMEOUT_MS, storyPrompt });
   } catch (err) {
     if (err instanceof HttpError) throw err;
     throw new HttpError(err.message || 'Помилка генерації тексту.', err.status);

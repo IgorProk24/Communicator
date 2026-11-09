@@ -2,7 +2,7 @@
 // xAI directly (server build) or OpenRouter (browser build: xAI does not accept calls from web pages).
 // Plain fetch + SSE parsing, so the same code runs on the Node server and in the browser build.
 import { CHAPTER_SCHEMA, buildSystemPrompt, buildUserMessage } from './prompts.js';
-import { StoryError, parseChapter, slidesSoFar } from './chapter.js';
+import { StoryError, parseChapter, slidesSoFar, slideEmitter } from './chapter.js';
 
 const env = globalThis.process?.env ?? {};
 export const GROK_URL = 'https://api.x.ai/v1';
@@ -28,11 +28,12 @@ function grokErrorMessage(data) {
 }
 
 export async function writeChapterGrok({
-  apiKey, model, story, prompt, storyPrompt, onProgress, signal, timeout = 180_000,
+  apiKey, model, story, prompt, storyPrompt, onProgress, onSlide, signal, timeout = 180_000,
   baseUrl = GROK_URL, via = 'xAI',
 }) {
   if (!apiKey) throw new StoryError(`Немає ключа ${via} для Grok. Додай його в налаштуваннях.`, 400);
   const t = withTimeout(signal, timeout);
+  const emit = slideEmitter(onSlide);
   let text = '';
   try {
     onProgress?.({ phase: 'thinking', slides: 0 });
@@ -105,6 +106,7 @@ export async function writeChapterGrok({
         if (delta) {
           text += delta;
           onProgress?.({ phase: 'writing', slides: slidesSoFar(text) });
+          emit(text);
         }
         if (choice?.finish_reason) finish = choice.finish_reason;
       }

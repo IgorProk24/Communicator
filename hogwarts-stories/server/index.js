@@ -14,6 +14,19 @@ const DEMO = process.env.DEMO_MODE === '1';
 const PLACEHOLDER_IMAGES = DEMO || PROVIDER === 'none';
 
 const app = express();
+
+// Optional password for a public deployment, so strangers can't spend the API credits.
+// The browser shows its own login prompt; any user name works.
+const APP_PASSWORD = process.env.APP_PASSWORD;
+if (APP_PASSWORD) {
+  app.use((req, res, next) => {
+    const [scheme, encoded] = (req.headers.authorization || '').split(' ');
+    const password = scheme === 'Basic' && encoded ? Buffer.from(encoded, 'base64').toString().split(':').slice(1).join(':') : '';
+    if (password === APP_PASSWORD) return next();
+    res.set('WWW-Authenticate', 'Basic realm="Hogwarts Stories", charset="UTF-8"').status(401).send('Потрібен пароль');
+  });
+}
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/generated', express.static(IMAGES_DIR, { maxAge: '30d', immutable: true }));

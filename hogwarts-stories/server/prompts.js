@@ -14,7 +14,7 @@ export const SYSTEM_PROMPT = `Ти — сценарист інтерактивн
 - sfx — звукове слово для кадру з дією («БАХ!», «ШУРХ…», «ВЖУХ!»), або порожній рядок.
 
 Ілюстрації малює окрема модель, яка не знає сюжету і не читає українською, тому:
-- image_prompt пиши англійською: що відбувається в кадрі, ракурс (close-up, wide shot, low angle…), місце, світло, настрій. Вертикальна композиція.
+- image_prompt пиши англійською, як опис кадру з фільму: що відбувається, ракурс (close-up, medium shot, wide shot, low angle…), місце, світло, емоції на обличчях. Вертикальна композиція; верх і низ кадру лишай спокійнішими, бо там будуть підписи й репліки.
 - Не називай у image_prompt жодних імен персонажів, назв франшизи чи брендів — описуй людей тільки за зовнішністю (наприклад, "the bespectacled boy with messy black hair"). Не проси тексту, літер чи бульбашок із репліками на картинці.
 - characters_in_frame — імена (як у characters) усіх, хто видно в кадрі.
 - characters — повний актуальний «візуальний паспорт» усіх персонажів, що вже з'являлися: name українською, visual англійською (вік, статура, волосся, очі, одяг, характерні деталі). Зберігай описи з попередніх розділів незмінними, щоб герої виглядали однаково; додавай нових за потреби.
@@ -102,11 +102,20 @@ export function buildUserMessage(story, prompt) {
   return parts.join('\n\n');
 }
 
-export const IMAGE_STYLE =
-  'Vertical comic book panel, 2:3 portrait. Rich hand-inked lines with painterly watercolor shading, ' +
-  'cinematic lighting, magical warm-and-moody palette, expressive faces, detailed background of a ' +
-  'gothic wizarding castle world. Original character designs. Absolutely no text, letters, captions, ' +
-  'logos or speech bubbles in the image.';
+const STYLES = {
+  realistic:
+    'Photorealistic cinematic film still, vertical 9:16 frame. Shot on 35mm, natural skin texture, ' +
+    'realistic lighting with soft volumetric haze, shallow depth of field, rich but natural colors, ' +
+    'set in a gothic wizarding castle world with candles, stone and wood. Characters are original ' +
+    'people who do not resemble any real actor or celebrity. Absolutely no text, letters, captions, ' +
+    'logos, watermarks or speech bubbles in the image.',
+  comic:
+    'Vertical comic book panel, 2:3 portrait. Rich hand-inked lines with painterly watercolor shading, ' +
+    'cinematic lighting, magical warm-and-moody palette, expressive faces, detailed background of a ' +
+    'gothic wizarding castle world. Original character designs. Absolutely no text, letters, captions, ' +
+    'logos or speech bubbles in the image.',
+};
+export const IMAGE_STYLE = STYLES[process.env.IMAGE_STYLE] || STYLES.realistic;
 
 export function buildImagePrompt(slide, characters = []) {
   const inFrame = new Set((slide.characters_in_frame || []).map((n) => n.trim().toLowerCase()));

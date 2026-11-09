@@ -449,7 +449,7 @@ fetch('/api/config')
   .then((r) => r.json())
   .then((cfg) => {
     if (cfg.demo) els.demoNote.textContent = 'Демо-режим: сценарій і малюнки — заглушки. Додай ключі API в .env, щоб чаклувати по-справжньому.';
-    else if (cfg.placeholderImages) els.demoNote.textContent = 'OPENAI_API_KEY не задано — замість ілюстрацій будуть заглушки.';
+    else if (cfg.placeholderImages) els.demoNote.textContent = 'Немає ключа для картинок (OPENROUTER_API_KEY або OPENAI_API_KEY) — замість ілюстрацій будуть заглушки.';
     else return;
     show(els.demoNote);
   })

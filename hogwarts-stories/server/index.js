@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeChapter, StoryError } from './story.js';
-import { drawPanel, ImageError } from './images.js';
+import { drawPanel, ImageError, PROVIDER } from './images.js';
 import { buildImagePrompt } from './prompts.js';
 import { mockChapter, mockPanelSvg } from './mock.js';
 
@@ -11,7 +11,7 @@ const ROOT = path.resolve(here, '..');
 const IMAGES_DIR = path.join(ROOT, 'generated');
 const PORT = Number(process.env.PORT) || 3000;
 const DEMO = process.env.DEMO_MODE === '1';
-const PLACEHOLDER_IMAGES = DEMO || !process.env.OPENAI_API_KEY;
+const PLACEHOLDER_IMAGES = DEMO || PROVIDER === 'none';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -69,5 +69,6 @@ app.post('/api/image', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✨ Hogwarts Stories: http://localhost:${PORT}`);
   if (DEMO) console.log('   Демо-режим: сценарій і картинки — заглушки, ключі API не потрібні.');
-  else if (PLACEHOLDER_IMAGES) console.log('   OPENAI_API_KEY не задано — замість ілюстрацій будуть заглушки.');
+  else if (PLACEHOLDER_IMAGES) console.log('   Немає ключа для картинок (OPENROUTER_API_KEY або OPENAI_API_KEY) — будуть заглушки.');
+  else console.log(`   Картинки: ${PROVIDER}`);
 });

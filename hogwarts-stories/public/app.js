@@ -3,8 +3,7 @@
 import { CATALOG } from './catalog.js';
 
 const STORAGE_KEY = 'stories-for-two:v1';
-const HOLD_MS = 220;
-const SLIDES = 5;
+const SEED_STRIDE = 16; // keeps per-slide placeholder seeds distinct across chapters
 const LOADING_LINES = ['Пишемо продовження…', 'Підбираємо слова…', 'Вона вже чекає…', 'Ще кілька секунд…'];
 
 // GitHub Pages build: pages/direct.js installs a browser-only backend before this script runs.
@@ -13,7 +12,7 @@ const backend = window.__directBackend || null;
 const $ = (id) => document.getElementById(id);
 const els = {
   home: $('home'), library: $('library'), viewer: $('viewer'), stage: $('stage'), slide: $('slide'), bars: $('bars'),
-  chapterLabel: $('chapterLabel'), avatar: $('viewerAvatar'), pauseBtn: $('pauseBtn'), closeBtn: $('closeBtn'),
+  chapterLabel: $('chapterLabel'), avatar: $('viewerAvatar'), closeBtn: $('closeBtn'),
   ask: $('ask'), askForm: $('askForm'), askPrompt: $('askPrompt'), askChips: $('askChips'), askChapter: $('askChapter'), askBackBtn: $('askBackBtn'),
   intro: $('intro'), introCover: $('introCover'), introHeroine: $('introHeroine'), introTitle: $('introTitle'), introSetting: $('introSetting'),
   introProgress: $('introProgress'), introContinue: $('introContinue'), introRestart: $('introRestart'), introRestartNote: $('introRestartNote'),
@@ -27,10 +26,6 @@ const els = {
 let lib = load();
 let currentId = null;
 let pos = { c: 0, s: 0 };
-let elapsed = 0;
-let lastTick = 0;
-let userPaused = false;
-let holding = false;
 let busy = false;
 
 function load() {
@@ -281,7 +276,7 @@ function setLoading(on) {
 
 function showProgress({ phase, slides }) {
   els.loadingProgress.textContent =
-    phase === 'thinking' ? 'Обдумуємо сюжет…' : `Пишемо: кадр ${Math.max(1, slides)} з ${SLIDES}`;
+    phase === 'thinking' ? 'Обдумуємо сюжет…' : `Пишемо: кадр ${Math.max(1, slides)}`;
 }
 
 // ---------- Generation ----------
@@ -347,7 +342,6 @@ async function generateChapter(id, prompt) {
     });
     currentId = id;
     pos = { c: st.chapters.length - 1, s: 0 };
-    elapsed = 0;
     save();
     hide(els.ask);
     showViewer();
@@ -378,7 +372,7 @@ async function drawImage(id, c, s) {
       characters: st.characters || [],
       heroine: preset(id).heroine,
       reference: st.portrait?.status === 'done' ? st.portrait.url : null,
-      seed: c * SLIDES + s,
+      seed: c * SEED_STRIDE + s,
     });
     await preload(await displayUrl(url));
     slide.image = { status: 'done', url };
@@ -418,18 +412,13 @@ function fillAvatar() {
   }
 }
 
-function slideDuration(slide) {
-  const chars = slide.narration.length + (slide.dialogues || []).reduce((n, d) => n + d.text.length, 0);
-  return Math.min(16000, Math.max(6000, 4000 + chars * 45));
-}
-
 function renderBars() {
   const ch = currentChapter();
   els.bars.replaceChildren(
     ...ch.slides.map((_, i) => {
       const bar = el('div', 'bar');
       const fill = el('i');
-      fill.style.width = i < pos.s ? '100%' : '0%';
+      fill.style.width = i <= pos.s ? '100%' : '0%'; // no timer: bars just show where you are
       bar.append(fill);
       return bar;
     }),
@@ -480,7 +469,6 @@ function renderSlide() {
   const slide = currentSlide();
   if (!slide) return;
   renderBars();
-  elapsed = 0;
   const frag = document.createDocumentFragment();
   frag.append(el('div', 'art'), el('div', 'shade-top'), el('div', 'shade-bottom'));
   if (slide.narration) frag.append(el('div', 'caption pop', slide.narration));
@@ -499,7 +487,9 @@ function renderSlide() {
     bubbles.append(b);
   });
   frag.append(bubbles);
-  if (userPaused) frag.append(el('div', 'paused-badge', '❚❚'));
+  // The reader moves on by tapping; say so on the very first frame of a story.
+  if (pos.c === 0 && pos.s === 0) frag.append(el('div', 'tap-hint', 'Торкнись праворуч, щоб гортати →'));
+  else if (isLastSlideOfStory()) frag.append(el('div', 'tap-hint', 'Торкнись, щоб вирішити, що далі →'));
   els.slide.replaceChildren(frag);
   renderArt();
 
@@ -530,58 +520,13 @@ function openAsk() {
   show(els.ask);
   els.bars.querySelectorAll('.bar > i').forEach((f) => (f.style.width = '100%'));
 }
-function setUserPaused(on) {
-  userPaused = on;
-  els.pauseBtn.textContent = on ? '▶' : '❚❚';
-  els.pauseBtn.setAttribute('aria-label', on ? 'Відтворити' : 'Пауза');
-  const badge = els.slide.querySelector('.paused-badge');
-  if (on && !badge) els.slide.append(el('div', 'paused-badge', '❚❚'));
-  if (!on) badge?.remove();
-}
-
-// ---------- Auto-advance ----------
-function canAdvance() {
-  if (els.viewer.classList.contains('hidden')) return false;
-  if (!els.ask.classList.contains('hidden') || busy || userPaused || holding || document.hidden) return false;
-  return currentSlide()?.image?.status === 'done'; // wait for the photo before the timer starts
-}
-function tick(now) {
-  const dt = lastTick ? Math.min(now - lastTick, 100) : 0;
-  lastTick = now;
-  if (canAdvance()) {
-    elapsed += dt;
-    const total = slideDuration(currentSlide());
-    const fill = els.bars.children[pos.s]?.firstElementChild;
-    if (fill) fill.style.width = `${Math.min(100, (elapsed / total) * 100)}%`;
-    if (elapsed >= total) next();
-  }
-  requestAnimationFrame(tick);
-}
-requestAnimationFrame(tick);
-
 // ---------- Input ----------
-let downAt = 0;
-let holdTimer;
-els.stage.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('button, .ask, textarea')) return;
-  downAt = performance.now();
-  holdTimer = setTimeout(() => (holding = true), HOLD_MS);
-});
-els.stage.addEventListener('pointerup', (e) => {
-  if (!downAt) return;
-  clearTimeout(holdTimer);
-  const wasHold = holding || performance.now() - downAt >= HOLD_MS;
-  downAt = 0;
-  holding = false;
-  if (wasHold) return; // releasing a hold just resumes
+// No auto-advance: the reader moves only by tapping (left third = back, the rest = forward).
+els.stage.addEventListener('click', (e) => {
+  if (e.target.closest('button, .ask, textarea, a')) return;
   const rect = els.stage.getBoundingClientRect();
   if (e.clientX - rect.left < rect.width * 0.3) prev();
   else next();
-});
-els.stage.addEventListener('pointercancel', () => {
-  clearTimeout(holdTimer);
-  downAt = 0;
-  holding = false;
 });
 els.stage.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -591,19 +536,15 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') prev();
   else if (e.key === ' ') {
     e.preventDefault();
-    setUserPaused(!userPaused);
+    next();
   } else if (e.key === 'Escape') showHome();
 });
 
-els.pauseBtn.addEventListener('click', () => setUserPaused(!userPaused));
 els.closeBtn.addEventListener('click', () => {
   save();
   showHome();
 });
-els.askBackBtn.addEventListener('click', () => {
-  hide(els.ask);
-  elapsed = 0;
-});
+els.askBackBtn.addEventListener('click', () => hide(els.ask));
 els.askPrompt.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();

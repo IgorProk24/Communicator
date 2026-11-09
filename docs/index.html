@@ -20,7 +20,7 @@
       <header class="lib-head">
         <div>
           <h1>Історії на двох</h1>
-          <p class="tagline">Обери історію і проживи її по-своєму. Кожні 5 кадрів ти вирішуєш, що буде далі.</p>
+          <p class="tagline">Обери історію і проживи її по-своєму. Після кожної сцени ти вирішуєш, що буде далі.</p>
         </div>
         <button id="keysToggle" class="icon-chip" type="button" aria-label="Ключі API">🔑</button>
       </header>
@@ -76,7 +76,6 @@
       <div class="topbar">
         <div class="avatar" id="viewerAvatar" aria-hidden="true"></div>
         <div class="chapter-label" id="chapterLabel"></div>
-        <button class="icon-btn" id="pauseBtn" aria-label="Пауза">❚❚</button>
         <button class="icon-btn" id="closeBtn" aria-label="До бібліотеки">✕</button>
       </div>
       <div class="slide" id="slide"></div>
@@ -89,7 +88,7 @@
             <span class="ask-chapter" id="askChapter"></span>
           </div>
           <h2>Що робиш далі?</h2>
-          <p class="ask-sub">Напиши будь-що, і наступні 5 кадрів будуть саме про це.</p>
+          <p class="ask-sub">Напиши будь-що, і наступна сцена буде саме про це.</p>
           <form id="askForm">
             <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Твоя дія…"></textarea>
             <div class="chips" id="askChips"></div>
@@ -104,7 +103,7 @@
   <div id="loading" class="loading hidden" role="status" aria-live="polite">
     <div class="pulse" aria-hidden="true"><span></span><span></span><span></span></div>
     <p id="loadingText">Пишемо продовження…</p>
-    <p class="loading-sub" id="loadingProgress">Наступні 5 кадрів</p>
+    <p class="loading-sub" id="loadingProgress">Наступна сцена</p>
     <p class="loading-time" id="loadingTime">0:00</p>
     <p class="loading-hint">Не згортай браузер, поки йде генерація.</p>
     <button type="button" class="btn btn-ghost loading-cancel" id="loadingCancel">Скасувати</button>

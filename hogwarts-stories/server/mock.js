@@ -13,7 +13,8 @@ export function mockChapter(story, prompt) {
   return {
     chapter_title: n === 1 ? 'Початок' : `Розділ ${n}: ${prompt.slice(0, 30)}`,
     characters: [{ name: h.name, visual: h.visual }],
-    slides: beats.map(([narration, lines], i) => ({
+    // Demo chapters vary in length the way real ones do (3, 5 or 4 frames).
+    slides: beats.slice(0, [3, 5, 4][(n - 1) % 3]).map(([narration, lines], i) => ({
       narration: i === 0 && n > 1 ? `(${prompt}) ${narration}` : narration,
       dialogues: lines.map(([speaker, text]) => ({ speaker, text })),
       sfx: '',

@@ -1,7 +1,7 @@
 // Writes the next chapter (5 slides) with Claude.
 // writeChapterWith() takes any Anthropic client, so the browser-only build reuses it.
 import Anthropic from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT, CHAPTER_SCHEMA, SLIDES_PER_CHAPTER, buildUserMessage } from './prompts.js';
+import { SYSTEM_PROMPT, CHAPTER_SCHEMA, MAX_SLIDES, buildUserMessage } from './prompts.js';
 
 const env = globalThis.process?.env ?? {};
 
@@ -52,7 +52,7 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, {
       onProgress({ phase: 'thinking', slides: 0 });
       stream.on('text', (_delta, snapshot) => {
         // Each slide object carries one "narration" key, so counting them tracks progress.
-        const slides = Math.min(SLIDES_PER_CHAPTER, (snapshot.match(/"narration"/g) || []).length);
+        const slides = Math.min(MAX_SLIDES, (snapshot.match(/"narration"/g) || []).length);
         onProgress({ phase: 'writing', slides });
       });
     }
@@ -111,7 +111,7 @@ export async function writeChapterWith(client, story, prompt, opts = DEFAULTS, {
   if (!Array.isArray(chapter.slides) || chapter.slides.length === 0) {
     throw new StoryError('Claude повернув порожній розділ. Спробуй ще раз.', 502);
   }
-  chapter.slides = chapter.slides.slice(0, SLIDES_PER_CHAPTER);
+  chapter.slides = chapter.slides.slice(0, MAX_SLIDES);
   chapter.next_options = (chapter.next_options || []).slice(0, 3);
   return chapter;
 }

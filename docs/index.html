@@ -105,6 +105,11 @@
         </form>
       </div>
 
+      <nav class="shelf-tabs" role="tablist" aria-label="Полиці бібліотеки">
+        <button type="button" role="tab" class="shelf-tab" data-shelf="main" id="tabMain">Історії</button>
+        <button type="button" role="tab" class="shelf-tab" data-shelf="manga" id="tabManga">Манга</button>
+      </nav>
+      <p class="shelf-note" id="shelfNote" hidden>Оригінальні історії в дусі популярних романтичних манг з дорослими героями. Перший розділ іде за сюжетом, а далі — одна підказка за сюжетом або твій варіант.</p>
       <section class="library" id="library" aria-label="Історії"></section>
       <p id="demoNote" class="note hidden"></p>
     </div>
@@ -130,6 +135,7 @@
       <div class="sheet-body">
         <p class="eyebrow" id="introHeroine"></p>
         <h2 id="introTitle"></h2>
+        <p class="inspired" id="introInspired" hidden></p>
         <p class="sheet-setting" id="introSetting"></p>
         <div id="introProgress" class="intro-progress" hidden>
           <button type="button" class="btn btn-accent" id="introContinue"></button>
@@ -167,7 +173,7 @@
           <h2>Що робиш далі?</h2>
           <p class="ask-sub">Напиши будь-що, і наступна сцена буде саме про це.</p>
           <form id="askForm">
-            <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Твоя дія…"></textarea>
+            <textarea id="askPrompt" rows="3" maxlength="1000" placeholder="Або напиши свою дію…"></textarea>
             <div class="chips" id="askChips"></div>
             <button type="submit" class="btn btn-accent">Продовжити</button>
           </form>

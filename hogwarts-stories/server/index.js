@@ -99,7 +99,7 @@ app.post('/api/image', async (req, res) => {
     let prompt;
     let reference = null;
     if (portrait) {
-      prompt = buildPortraitPrompt(portrait, { style: req.body?.prompts?.imageStyle });
+      prompt = buildPortraitPrompt(portrait, { style: req.body?.prompts?.imageStyle, preset: req.body?.stylePreset });
     } else {
       const characters = Array.isArray(req.body?.characters) ? req.body.characters.filter(validPerson) : [];
       const heroine = validPerson(req.body?.heroine) ? req.body.heroine : null;
@@ -107,7 +107,7 @@ app.post('/api/image', async (req, res) => {
       prompt = buildImagePrompt(
         { image_prompt: clean(slide.image_prompt, 4000), characters_in_frame: slide.characters_in_frame || [] },
         characters,
-        { heroine, hasReference: Boolean(reference), style: req.body?.prompts?.imageStyle },
+        { heroine, hasReference: Boolean(reference), style: req.body?.prompts?.imageStyle, preset: req.body?.stylePreset },
       );
     }
     const file = await drawPanel(prompt, IMAGES_DIR, reference);

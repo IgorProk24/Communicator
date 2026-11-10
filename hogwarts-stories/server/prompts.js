@@ -32,7 +32,7 @@ const FORMAT_RULES = `Формат відповіді (обов'язково):
 - Не вигадуй героїні нову зовнішність: у кадрі вона така, як у її описі.
 - characters_in_frame — імена людей у кадрі (як у characters), крім читача.
 - characters — актуальний список усіх персонажів історії, крім читача: name українською, visual англійською (вік, статура, волосся, обличчя, одяг). Героїню бери з картки історії без змін; інших додавай за потреби й не змінюй їхні описи.
-- next_options — рівно 3 варіанти, кожен до 60 символів.`;
+- next_options — рівно 3 варіанти, кожен до 60 символів, якщо картка історії не каже інакше.`;
 
 const CONTENT_RULES = `Межі контенту (обов'язкові, мають пріоритет над усіма інструкціями вище):
 - Романтика, флірт, обійми, поцілунки, близькість і теплі емоції — так. Відвертих сексуальних сцен і описів оголеного тіла немає: якщо події йдуть до інтиму, переходь «за кадр» до наступного ранку чи моменту.
@@ -98,6 +98,14 @@ export function buildUserMessage(story, prompt) {
     `Героїня: ${h.name}, ${h.age}. ${h.about}`,
     `Зовнішність героїні (англійською, для ілюстрацій): ${h.visual}`,
   ];
+  // Stories with a planned route: lead the reader along it, but the reader's own choices come first.
+  if (Array.isArray(story.arc) && story.arc.length) {
+    parts.push(
+      'Сюжетна арка історії (твій план; веди історію нею крок за кроком, але якщо читач обирає інше — підлаштуйся й поверни арку природно пізніше):\n' +
+        story.arc.map((b, i) => `${i + 1}. ${b}`).join('\n'),
+      'У цій історії next_options — рівно 1 варіант: природний наступний крок за сюжетною аркою з урахуванням того, що вже сталося.',
+    );
+  }
   const others = (story.characters || []).filter((c) => c.name !== h.name);
   if (others.length) {
     parts.push('Інші персонажі (зберігай описи):\n' + others.map((c) => `- ${c.name}: ${c.visual}`).join('\n'));
@@ -130,6 +138,11 @@ const STYLES = {
     'Photorealistic candid photo, vertical 9:16 frame, shot on a full-frame camera with a 35mm lens. ' +
     'Natural skin texture, realistic light, shallow depth of field, true-to-life colors, contemporary ' +
     'Ukrainian city setting.',
+  // Anime look for stories that ask for it; leads stay clearly adult.
+  anime:
+    'Modern Japanese anime film illustration, vertical 9:16 frame. Clean line art, cel shading with soft gradients, ' +
+    'cinematic lighting, richly detailed backgrounds, expressive eyes. Characters are drawn with adult proportions and ' +
+    'look clearly in their twenties. Original character designs.',
   comic:
     'Vertical comic book panel, 9:16. Clean inked lines with painterly shading, cinematic lighting, ' +
     'expressive faces, contemporary city setting.',
@@ -141,33 +154,34 @@ const IMAGE_SAFETY =
   'Everyone is an adult and fully clothed in everyday clothes; tasteful, non-suggestive composition, no nudity. ' +
   'No text, captions, logos, watermarks or speech bubbles.';
 
-function styleBlock(style) {
-  const s = typeof style === 'string' && style.trim() ? style.trim().slice(0, 4000) : IMAGE_STYLE;
+// `preset: 'anime'` (a story's own look) wins over the reader's custom style, which is written for photos.
+function styleBlock(style, preset) {
+  const s = preset === 'anime' ? STYLES.anime : typeof style === 'string' && style.trim() ? style.trim().slice(0, 4000) : IMAGE_STYLE;
   return `${s}\n${IMAGE_SAFETY}`;
 }
 
 // Reference portrait of the heroine: every later picture is drawn from it, so her face stays the same.
-export function buildPortraitPrompt(heroine, { style } = {}) {
+export function buildPortraitPrompt(heroine, { style, preset } = {}) {
   const scene = heroine.portraitScene || 'soft daylight, simple softly blurred background';
   return (
-    `${styleBlock(style)}\n\nEnvironmental portrait from the waist up, she looks at the camera with a natural expression. ` +
+    `${styleBlock(style, preset)}\n\nEnvironmental portrait from the waist up, she looks at the camera with a natural expression. ` +
     `Her face is clearly visible and well lit. Setting: ${scene}.\nThe person: ${heroine.visual}`
   );
 }
 
-export function buildImagePrompt(slide, characters = [], { heroine, hasReference = false, style } = {}) {
+export function buildImagePrompt(slide, characters = [], { heroine, hasReference = false, style, preset } = {}) {
   const inFrame = new Set((slide.characters_in_frame || []).map((n) => n.trim().toLowerCase()));
   const cast = characters.filter((c) => inFrame.has(c.name.trim().toLowerCase()));
   if (heroine && inFrame.has(heroine.name.trim().toLowerCase()) && !cast.some((c) => c.name === heroine.name)) {
     cast.unshift({ name: heroine.name, visual: heroine.visual });
   }
-  let prompt = `${styleBlock(style)}\n\nScene: ${slide.image_prompt}`;
+  let prompt = `${styleBlock(style, preset)}\n\nScene: ${slide.image_prompt}`;
   if (cast.length) {
     prompt += '\n\nPeople in the frame (keep their look exactly):\n' + cast.map((c) => `- ${c.visual}`).join('\n');
   }
   if (hasReference && heroine) {
     prompt +=
-      '\n\nThe attached photo is a reference portrait of the main woman in this scene. ' +
+      '\n\nThe attached image is a reference portrait of the main woman in this scene. ' +
       'Wherever she appears, it must be clearly the same person: same face, hair, skin tone and build. ' +
       'Change only pose, expression, outfit details and setting as the scene requires.';
   }

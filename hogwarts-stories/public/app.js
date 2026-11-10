@@ -143,9 +143,36 @@ function renderChips(box, items, textarea) {
 }
 
 // ---------- Library ----------
+// Two shelves: own stories, and stories in the spirit of romance manga.
+const SHELF_KEY = 'stories-for-two:shelf';
+let shelf = (() => {
+  try {
+    return localStorage.getItem(SHELF_KEY) === 'manga' ? 'manga' : 'main';
+  } catch {
+    return 'main';
+  }
+})();
+const shelfOf = (p) => p.shelf || 'main';
+function renderShelfTabs() {
+  for (const tab of document.querySelectorAll('.shelf-tab')) tab.setAttribute('aria-selected', String(tab.dataset.shelf === shelf));
+  $('shelfNote').hidden = shelf !== 'manga';
+}
+for (const tab of document.querySelectorAll('.shelf-tab')) {
+  tab.addEventListener('click', () => {
+    shelf = tab.dataset.shelf;
+    try {
+      localStorage.setItem(SHELF_KEY, shelf);
+    } catch {
+      /* not important */
+    }
+    renderLibrary();
+  });
+}
+
 function renderLibrary() {
+  renderShelfTabs();
   els.library.replaceChildren(
-    ...CATALOG.map((p) => {
+    ...CATALOG.filter((p) => shelfOf(p) === shelf).map((p) => {
       const chapters = lib[p.id]?.chapters?.length || 0;
       const card = el('button', 'card');
       card.type = 'button';
@@ -157,7 +184,9 @@ function renderLibrary() {
       const who = el('span', 'card-who', `${p.heroine.name}, ${p.heroine.age}`);
       if (p.heroine.trait) who.append(el('span', 'card-trait', p.heroine.trait));
       body.append(who, el('span', 'card-title', p.title), el('span', 'card-line', p.tagline));
+      if (p.inspiredBy) body.append(el('span', 'card-inspired', `У дусі «${p.inspiredBy}»`));
       card.append(art, el('div', 'card-shade'), body, el('span', 'card-badge', chapters ? `Розділ ${chapters}` : 'Нова'));
+      if (p.shelf === 'manga') card.append(el('span', 'card-style', p.style === 'anime' ? 'Аніме' : 'Реалістично'));
       card.addEventListener('click', () => openIntro(p.id));
       return card;
     }),
@@ -195,6 +224,10 @@ function openIntro(id) {
   fillPortrait(els.introCover, id);
   els.introHeroine.textContent = `${p.heroine.name}, ${p.heroine.age}`;
   els.introTitle.textContent = p.title;
+  $('introInspired').hidden = !p.inspiredBy;
+  $('introInspired').textContent = p.inspiredBy
+    ? `Оригінальна історія в дусі манги «${p.inspiredBy}»: свої герої й сюжет.`
+    : '';
   els.introSetting.textContent = `${p.setting} ${p.heroine.about}`;
   els.introRestartNote.hidden = true;
   els.introRestart.dataset.armed = '';
@@ -329,6 +362,7 @@ function storyForApi(id) {
     title: p.title,
     setting: p.setting,
     heroine: p.heroine,
+    ...(p.arc ? { arc: p.arc } : {}),
     characters: st.characters || [],
     chapters: (st.chapters || []).map((ch) => ({
       prompt: ch.prompt,
@@ -345,7 +379,14 @@ function ensurePortrait(id) {
   if (lib[id].portrait?.status === 'done') return Promise.resolve(lib[id].portrait.url);
   if (!portraitJobs.has(id)) {
     const job = modelsReady
-      .then(() => api('/api/image', { portrait: preset(id).heroine, prompts: customPrompts(), seed: CATALOG.findIndex((p) => p.id === id) }))
+      .then(() =>
+        api('/api/image', {
+          portrait: preset(id).heroine,
+          prompts: customPrompts(),
+          stylePreset: preset(id).style,
+          seed: CATALOG.findIndex((p) => p.id === id),
+        }),
+      )
       .then(({ url }) => {
         lib[id] ||= {};
         lib[id].portrait = { status: 'done', url };
@@ -507,6 +548,7 @@ async function drawImage(id, c, s) {
       heroine: preset(id).heroine,
       reference: st.portrait?.status === 'done' ? st.portrait.url : null,
       prompts: customPrompts(),
+      stylePreset: preset(id).style,
       seed: c * SEED_STRIDE + s,
     });
     await preload(await displayUrl(url));
@@ -676,7 +718,18 @@ function prev() {
 }
 function openAsk() {
   els.askChapter.textContent = `Кінець розділу ${pos.c + 1}`;
-  renderChips(els.askChips, currentChapter().options || [], els.askPrompt);
+  const options = currentChapter().options || [];
+  if (preset(currentId).arc) {
+    // One step along the story's arc, plus the reader's own move in the text box.
+    renderChips(els.askChips, options.slice(0, 1), els.askPrompt);
+    const chip = els.askChips.firstElementChild;
+    if (chip) {
+      chip.classList.add('canon');
+      chip.prepend('📖 За сюжетом: ');
+    }
+  } else {
+    renderChips(els.askChips, options, els.askPrompt);
+  }
   els.askPrompt.value = '';
   show(els.ask);
   els.bars.querySelectorAll('.bar > i').forEach((f) => (f.style.width = '100%'));

@@ -174,15 +174,15 @@ async function drawWith(model, content, openrouter, modalities = ['image', 'text
 // Draws a slide, or (with `portrait`) the heroine's reference portrait. A `reference` portrait is
 // sent along with every slide so the image model keeps her face the same across the story.
 // The chosen model (Seedream) goes first; if it fails, the fallback (Grok's image model) tries once.
-async function image({ slide, characters, heroine, reference, portrait, prompts }) {
+async function image({ slide, characters, heroine, reference, portrait, prompts, stylePreset }) {
   const keys = readKeys();
   const { openrouter } = keys;
   if (!openrouter) throw new HttpError('Спершу додай ключ OpenRouter у налаштуваннях (⚙️).', 400);
   const style = prompts?.imageStyle;
   const refData = reference ? await resolveUrl(reference).catch(() => null) : null;
   const prompt = portrait
-    ? buildPortraitPrompt(portrait, { style })
-    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData), style });
+    ? buildPortraitPrompt(portrait, { style, preset: stylePreset })
+    : buildImagePrompt(slide, Array.isArray(characters) ? characters : [], { heroine, hasReference: Boolean(refData), style, preset: stylePreset });
   const content = refData
     ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: refData } }]
     : prompt;
